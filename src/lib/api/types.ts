@@ -549,7 +549,7 @@ export interface components {
          * @description Hope Programme activity taxonomy.
          * @enum {string}
          */
-        ActivityType: "GoalSetting" | "Gratitude" | "MyHOPE";
+        ActivityType: "GoalSetting" | "Gratitude" | "Emotions" | "MyHOPE";
         /**
          * @description Draft style. Locked by the dashboard contract at
          *     `dropout_ml_v2/deploy/dashboard/app.py:79-107`.
