@@ -1,0 +1,68 @@
+services:
+  dropout-api:
+    build:
+      context: ../dropout_ml_v2
+      dockerfile: deploy/Dockerfile
+    container_name: hope-dropout-api
+    ports: ["8000:8000"]
+    environment:
+      HOPE_API_SECRET: ${HOPE_API_SECRET:-dev-secret}
+      HOPE_API_AUTH: ${HOPE_API_AUTH:-disabled}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  comment-api:
+    build:
+      context: ../comment_generation
+      dockerfile: Dockerfile.api
+    container_name: hope-comment-api
+    ports: ["8001:8001"]
+    environment:
+      HOPE_API_SECRET: ${HOPE_API_SECRET:-dev-secret}
+      HOPE_API_AUTH: ${HOPE_API_AUTH:-disabled}
+      HOPE_GEN_MODEL_ID: ${HOPE_GEN_MODEL_ID:-qwen2.5-1.5b-hope-only}
+      HOPE_DROPOUT_URL: http://dropout-api:8000/health
+      HOPE_DASHBOARD_ORIGIN: ${HOPE_DASHBOARD_ORIGIN:-http://localhost:3000}
+      HOPE_DROPOUT_PANEL_PATH: /data/dropout_artifacts/cumulative_features_panel.parquet
+    volumes:
+      - ../comment_generation/models:/app/models:ro
+      - ../comment_generation/outputs:/app/outputs
+      - ../dropout_ml_v2/outputs/artifacts:/data/dropout_artifacts:ro
+      - hf-cache:/root/.cache/huggingface
+    depends_on:
+      dropout-api:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8001/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    # Uncomment to use a CUDA GPU for the SLM:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - capabilities: [gpu]
+
+  dashboard:
+    build:
+      context: .
+    container_name: hope-dashboard
+    ports: ["3000:3000"]
+    environment:
+      COMMENT_GEN_URL: http://comment-api:8001
+      DROPOUT_API_URL: http://dropout-api:8000
+      HOPE_API_SECRET: ${HOPE_API_SECRET:-dev-secret}
+      AUTH_SECRET: ${AUTH_SECRET:-dev-auth-secret}
+      AUTH_URL: ${AUTH_URL:-http://localhost:3000}
+      FACILITATOR_EMAILS: ${FACILITATOR_EMAILS:-}
+      NEXT_PUBLIC_AUTH_PROVIDER: ${NEXT_PUBLIC_AUTH_PROVIDER:-dev-allowlist}
+    depends_on:
+      - comment-api
+      - dropout-api
+
+volumes:
+  hf-cache: {}

@@ -1,0 +1,50 @@
+# azd template — `azd up` reads this and runs the Bicep deployment.
+#
+# Pre-flight (one-time):
+#   az login
+#   az account set --subscription <SUB_ID>
+#   az group create -n hope-rg -l uksouth
+#   az acr create -n <ACR_NAME> -g hope-rg --sku Basic
+#   azd init -e dev   # records environment values
+#
+# After provisioning, upload adapters to the Azure Files share:
+#   az storage file upload-batch \
+#     --source ./comment_generation/models \
+#     --destination lora-adapters \
+#     --account-name <STORAGE_ACCOUNT_NAME>
+#
+# Then `azd deploy` (or `azd up`) builds + pushes images via ACR tasks.
+
+name: hope-facilitator
+metadata:
+  template: hope-facilitator@0.1.0
+
+infra:
+  provider: bicep
+  path: .
+  module: main
+
+services:
+  dropout-api:
+    project: ../../../dropout_ml_v2
+    docker:
+      path: ./deploy/Dockerfile
+      context: .
+    host: containerapp
+    language: python
+
+  comment-api:
+    project: ../../../comment_generation
+    docker:
+      path: ./Dockerfile.api
+      context: .
+    host: containerapp
+    language: python
+
+  dashboard:
+    project: ../..
+    docker:
+      path: ./Dockerfile
+      context: .
+    host: containerapp
+    language: js
