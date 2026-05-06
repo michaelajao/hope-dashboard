@@ -76,6 +76,7 @@ export function createDropoutClient(opts: Partial<ApiClientOptions> = {}) {
                 method: "POST",
                 path: "/predict",
                 body,
+                signed: true,
             }),
 
         batch: (body: BatchRequest) =>
@@ -83,6 +84,7 @@ export function createDropoutClient(opts: Partial<ApiClientOptions> = {}) {
                 method: "POST",
                 path: "/batch",
                 body,
+                signed: true,
             }),
     };
 }
