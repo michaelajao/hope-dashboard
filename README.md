@@ -21,24 +21,46 @@ Talks to two backends:
 ## Getting started
 
 ```bash
-cp .env.example .env.local        # fill in HOPE_API_SECRET, AUTH_SECRET, etc.
+cp .env.example .env.local        # fill in COMMENT_GEN_URL etc.
 npm install
 npm run gen:types                 # regenerate types from the OpenAPI spec
 npm run dev                       # http://localhost:3000
 ```
 
-The two backends must be running for `/cohorts/...` pages to load real data:
+### Pointing at the backend
+
+`COMMENT_GEN_URL` (and `NEXT_PUBLIC_COMMENT_GEN_URL`) decides where the
+dashboard sends `/generate` and `/memory/...`. Three valid setups:
+
+| Setup | `COMMENT_GEN_URL` | When |
+|---|---|---|
+| Backend on same host | `http://localhost:8011` | Both repos running on the same machine. Note: `:8001` is held by JupyterHub on Brosnan HPC, so use `:8011` there. |
+| Backend on HPC, dashboard on laptop | `http://<hpc-tunnel-host>:8011` | SSH tunnel or Cloudflare Tunnel. |
+| Backend on HF Spaces | `https://michaelajao-hope-comment-gen-api.hf.space` | Production-style. See `comment_generation/space/DEPLOY.md`. |
+
+If running both backends locally:
 
 ```bash
 # in comment_generation/
-HOPE_API_AUTH=disabled uvicorn service.main:app --port 8001
+HOPE_API_AUTH=disabled \
+HOPE_GEN_MODEL_ID=qwen3-4b-hope-only \
+uvicorn service.main:app --port 8011
 
 # in dropout_ml_v2/deploy/
 uvicorn api.main:app --port 8000
 ```
 
-For local development without auth, set `HOPE_API_AUTH=disabled` on the
-backend and leave `HOPE_API_SECRET` blank in `.env.local`.
+### Auth
+
+This dashboard uses NextAuth v5 with the **dev-allowlist Credentials
+provider** by default. Set `FACILITATOR_EMAILS=` to a comma-separated
+allowlist (empty = allow any email in dev). Magic-link via Nodemailer is
+intentionally not wired in this build because it pulls Node-only modules
+into the Edge runtime; re-introduce it through the documented Auth.js
+Edge/Node split when configuring SMTP for the real workshop.
+
+For local development without HMAC, set `HOPE_API_AUTH=disabled` on the
+backend.
 
 ## Repo layout
 
