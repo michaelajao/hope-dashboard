@@ -93,6 +93,13 @@ export type PredictionResponse = {
     risk_level: RiskLevel;
     contributing_factors: string[];
     recommended_actions: string[];
+
+    // Optional. Aligned with `contributing_factors` 1:1. Each entry is the
+    // normalised |SHAP| magnitude for the corresponding factor, summing to
+    // ~1 across the returned top-K. Absent for non-tree models or when the
+    // rule-based fallback supplies the factors. Dashboard falls back to
+    // decaying synthetic weights when this field is missing.
+    contributing_factor_weights?: number[];
 };
 
 export type BatchResponse = {

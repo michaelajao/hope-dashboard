@@ -14,7 +14,7 @@ import { EmptyState } from "@/components/empty-state";
 import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { DraftCard } from "@/components/draft-card";
+import { DraftCard, type DraftContext } from "@/components/draft-card";
 import { FollowUpActivity } from "@/components/follow-up-activity";
 import {
     useEvent,
@@ -25,6 +25,7 @@ import {
 import { demoEngagementContext, syntheticHistory } from "@/lib/demo-events";
 import { useUiStore } from "@/lib/store/uiStore";
 import { RECOMMENDED_APPROACH_BULLETS } from "@/lib/risk";
+import { daysSinceLastEvent } from "@/lib/signals";
 import type { CohortMeta } from "@/lib/cohorts";
 import type {
     ActivityType,
@@ -179,15 +180,29 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                     </div>
                 )}
 
-                {response?.drafts.map((d) => (
-                    <DraftCard
-                        key={String(d.draft_id)}
-                        draft={d}
-                        onThumb={onThumb}
-                        onSend={onSend}
-                        pending={event.isPending}
-                    />
-                ))}
+                {response?.drafts.map((d) => {
+                    const ctx: DraftContext | undefined = response
+                        ? {
+                              topFactors:
+                                  prediction.data?.contributing_factors ?? [],
+                              lastActiveDays: history
+                                  ? daysSinceLastEvent(history)
+                                  : null,
+                              memoryUsed: Boolean(response.memory_used),
+                              engagementUsed: Boolean(response.engagement_used),
+                          }
+                        : undefined;
+                    return (
+                        <DraftCard
+                            key={String(d.draft_id)}
+                            draft={d}
+                            onThumb={onThumb}
+                            onSend={onSend}
+                            pending={event.isPending}
+                            context={ctx}
+                        />
+                    );
+                })}
 
                 {response && (
                     <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">

@@ -11,12 +11,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useCohortBatch } from "@/lib/hooks/api";
 import { syntheticBatch, syntheticHistory } from "@/lib/demo-events";
 import { useUiStore } from "@/lib/store/uiStore";
+import { useQueueStore } from "@/lib/store/queueStore";
 import { QUEUE_PILL_LABELS } from "@/lib/risk";
-import { lastActiveLabel } from "@/lib/signals";
+import { lastActiveLabel, displayName } from "@/lib/signals";
 import type { CohortMeta } from "@/lib/cohorts";
 import type { RiskLevel } from "@/lib/api/dropout";
 
 const FILTERS: Array<RiskLevel | "all"> = ["all", "high", "medium", "low"];
+
+function useMountTime(): number {
+    const [t] = useState(() => Date.now());
+    return t;
+}
 
 export function Queue({ cohort }: { cohort: CohortMeta }) {
     const histories = useMemo(
@@ -26,27 +32,43 @@ export function Queue({ cohort }: { cohort: CohortMeta }) {
     const { data, isLoading, error } = useCohortBatch(histories);
     const selectedId = useUiStore((s) => s.selectedParticipantId);
     const select = useUiStore((s) => s.selectParticipant);
+    const snoozedUntil = useQueueStore((s) => s.snoozedUntil);
+    const dismissedAt = useQueueStore((s) => s.dismissedAt);
+    const undoSnooze = useQueueStore((s) => s.undoSnooze);
+    const undoDismiss = useQueueStore((s) => s.undoDismiss);
+    const now = useMountTime();
+
     const [filter, setFilter] = useState<RiskLevel | "all">("all");
     const [query, setQuery] = useState("");
+    const [showHidden, setShowHidden] = useState(false);
 
-    const visible = useMemo(() => {
+    const { visible, hidden } = useMemo(() => {
         const preds = data?.predictions ?? [];
         const q = query.trim().toLowerCase();
-        return preds
-            .filter((p) =>
-                filter === "all" ? true : p.risk_level === filter,
-            )
-            .filter((p) =>
-                q ? p.participant_id.toLowerCase().includes(q) : true,
-            );
-    }, [data?.predictions, filter, query]);
+        const matchesFilter = preds.filter((p) =>
+            filter === "all" ? true : p.risk_level === filter,
+        );
+        const matchesQuery = matchesFilter.filter((p) =>
+            q ? p.participant_id.toLowerCase().includes(q) : true,
+        );
+        const visible: typeof matchesQuery = [];
+        const hidden: typeof matchesQuery = [];
+        for (const p of matchesQuery) {
+            const isDismissed = Boolean(dismissedAt[p.participant_id]);
+            const snoozed = snoozedUntil[p.participant_id];
+            const isSnoozed = snoozed !== undefined && snoozed > now;
+            if (isDismissed || isSnoozed) hidden.push(p);
+            else visible.push(p);
+        }
+        return { visible, hidden };
+    }, [data?.predictions, filter, query, snoozedUntil, dismissedAt, now]);
 
     return (
         <Card className="flex flex-col">
             <CardHeader>
                 <div className="flex items-center justify-between">
                     <CardTitle>Follow-up queue</CardTitle>
-                    <Badge variant="neutral">{data?.total ?? "—"}</Badge>
+                    <Badge variant="neutral">{visible.length}</Badge>
                 </div>
                 <div className="space-y-2 pt-2">
                     <Input
@@ -79,12 +101,12 @@ export function Queue({ cohort }: { cohort: CohortMeta }) {
                     </div>
                 )}
                 {error && (
-                    <p className="text-xs text-rose-600">
+                    <p className="text-xs text-risk-hi">
                         Failed to load: {String((error as Error).message)}
                     </p>
                 )}
                 {visible.length === 0 && !isLoading && !error && (
-                    <p className="px-1 py-4 text-center text-xs text-slate-500">
+                    <p className="px-1 py-4 text-center text-xs text-muted">
                         No participants match the current filter.
                     </p>
                 )}
@@ -101,6 +123,57 @@ export function Queue({ cohort }: { cohort: CohortMeta }) {
                         onClick={() => select(p.participant_id)}
                     />
                 ))}
+                {hidden.length > 0 && (
+                    <div className="border-t border-border pt-2">
+                        <button
+                            type="button"
+                            onClick={() => setShowHidden((v) => !v)}
+                            className="w-full text-left text-xs text-muted hover:text-text-2"
+                        >
+                            {showHidden ? "Hide" : "Show"} {hidden.length}{" "}
+                            snoozed / dismissed
+                        </button>
+                        {showHidden && (
+                            <ul className="mt-2 space-y-1">
+                                {hidden.map((p) => {
+                                    const isDismissed = Boolean(
+                                        dismissedAt[p.participant_id],
+                                    );
+                                    return (
+                                        <li
+                                            key={p.participant_id}
+                                            className="flex items-center justify-between gap-2 rounded-md border border-border bg-surface-2 px-2.5 py-1.5"
+                                        >
+                                            <span className="truncate text-xs text-text-2">
+                                                {displayName(p.participant_id)}
+                                                <span className="ml-1.5 text-muted">
+                                                    {isDismissed
+                                                        ? "dismissed"
+                                                        : "snoozed"}
+                                                </span>
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    isDismissed
+                                                        ? undoDismiss(
+                                                              p.participant_id,
+                                                          )
+                                                        : undoSnooze(
+                                                              p.participant_id,
+                                                          )
+                                                }
+                                                className="text-xs text-accent-ink hover:underline"
+                                            >
+                                                Undo
+                                            </button>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        )}
+                    </div>
+                )}
             </CardContent>
         </Card>
     );

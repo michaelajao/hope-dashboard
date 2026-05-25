@@ -1,45 +1,59 @@
 @import "tailwindcss";
 
+/*
+ * Design tokens. oklch palette ported from the hope·move prototype
+ * (docs/prototype/Participant Support.html). Tailwind utilities pick the
+ * tokens up via the `@theme inline` block below, so you can write
+ * `bg-surface`, `text-text-2`, `bg-risk-hi-bg`, etc. directly in JSX.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --color-hope-purple: #6d4aff;
-  --color-hope-coral: #ff6b8b;
+  --bg:         oklch(98.5% 0.004 90);
+  --surface:    #ffffff;
+  --surface-2:  oklch(97% 0.005 90);
+  --border:     oklch(91% 0.006 90);
+  --border-2:   oklch(86% 0.008 90);
+  --text:       oklch(22% 0.012 250);
+  --text-2:     oklch(42% 0.012 250);
+  --muted:      oklch(58% 0.012 250);
+  --accent:     oklch(48% 0.14 255);
+  --accent-2:   oklch(96% 0.02 255);
+  --accent-ink: oklch(35% 0.14 255);
+  --risk-hi:    oklch(56% 0.17 25);
+  --risk-hi-bg: oklch(96% 0.03 25);
+  --risk-md:    oklch(62% 0.14 70);
+  --risk-md-bg: oklch(96% 0.04 80);
+  --risk-lo:    oklch(52% 0.12 155);
+  --risk-lo-bg: oklch(96% 0.04 155);
+
+  /* Legacy aliases. Existing utility classes still resolve. */
+  --background: var(--bg);
+  --foreground: var(--text);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-hope-purple: var(--color-hope-purple);
-  --color-hope-coral: var(--color-hope-coral);
+  --color-background: var(--bg);
+  --color-foreground: var(--text);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-border-2: var(--border-2);
+  --color-text: var(--text);
+  --color-text-2: var(--text-2);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
+  --color-accent-ink: var(--accent-ink);
+  --color-risk-hi: var(--risk-hi);
+  --color-risk-hi-bg: var(--risk-hi-bg);
+  --color-risk-md: var(--risk-md);
+  --color-risk-md-bg: var(--risk-md-bg);
+  --color-risk-lo: var(--risk-lo);
+  --color-risk-lo-bg: var(--risk-lo-bg);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
-  background: var(--background);
-  color: var(--foreground);
-}
-
-.hope-header-band {
-  background-image: linear-gradient(
-    90deg,
-    color-mix(in oklab, var(--color-hope-purple) 8%, transparent),
-    transparent 30%
-  );
-}
-
-.hope-header-stripe {
-  background: linear-gradient(
-    180deg,
-    var(--color-hope-purple),
-    var(--color-hope-coral)
-  );
+  background: var(--bg);
+  color: var(--text);
 }

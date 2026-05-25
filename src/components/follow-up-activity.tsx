@@ -1,13 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { StickyNote } from "lucide-react";
+import { useState, type FormEvent } from "react";
+import { Mail, Plus, StickyNote } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Textarea } from "@/components/ui/textarea";
 import { useMemory } from "@/lib/hooks/api";
 import { useNotesStore } from "@/lib/store/notesStore";
 import type { MemoryEntry } from "@/lib/api/commentGen";
@@ -20,9 +17,9 @@ type FollowUpActivityProps = {
 type ActivityEntry = {
     id: string;
     ts: string;
-    label: string;
-    text: string;
-    badgeVariant: "neutral" | "info";
+    kind: "message" | "note";
+    title: string;
+    sub: string;
 };
 
 function memoryEntryToActivity(m: MemoryEntry): ActivityEntry | null {
@@ -30,10 +27,22 @@ function memoryEntryToActivity(m: MemoryEntry): ActivityEntry | null {
     return {
         id: String(m.memory_id ?? `${m.ts ?? ""}-${m.activity_id ?? ""}`),
         ts: m.ts ?? "",
-        label: m.activity_type ? `Reply · ${m.activity_type}` : "Reply",
-        text: m.text ?? "",
-        badgeVariant: "info",
+        kind: "message",
+        title: m.activity_type ? `Sent · ${m.activity_type}` : "Sent reply",
+        sub: m.text ?? "",
     };
+}
+
+function timeAgo(ts: string): string {
+    if (!ts) return "";
+    const ms = Date.now() - new Date(ts).getTime();
+    if (ms < 60_000) return "just now";
+    const m = Math.floor(ms / 60_000);
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    const d = Math.floor(h / 24);
+    return `${d}d ago`;
 }
 
 export function FollowUpActivity({
@@ -45,16 +54,17 @@ export function FollowUpActivity({
         (s.notes[participantId] ?? []).map<ActivityEntry>((n) => ({
             id: n.id,
             ts: n.ts,
-            label: "Note",
-            text: n.text,
-            badgeVariant: "neutral",
+            kind: "note",
+            title: "Coach note added",
+            sub: n.text,
         })),
     );
     const addNote = useNotesStore((s) => s.addNote);
 
     const [draftNote, setDraftNote] = useState("");
 
-    function onAdd() {
+    function onAdd(e: FormEvent) {
+        e.preventDefault();
         const text = draftNote.trim();
         if (!text) return;
         addNote(participantId, text);
@@ -70,75 +80,75 @@ export function FollowUpActivity({
     );
 
     return (
-        <Card>
-            <CardHeader>
-                <div className="flex items-center justify-between gap-2">
-                    <CardTitle>Follow-up activity</CardTitle>
-                    <StickyNote
-                        className="h-4 w-4 text-slate-400"
-                        aria-hidden
-                    />
-                </div>
+        <Card className="p-0">
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
+                <CardTitle>Follow-up activity</CardTitle>
+                <span className="text-xs text-muted">
+                    {all.length} item{all.length === 1 ? "" : "s"}
+                </span>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="flex flex-col p-0">
                 {memory.isLoading ? (
-                    <div className="space-y-2">
+                    <div className="space-y-2 px-4 pb-3">
                         <Skeleton className="h-10 w-full" />
                         <Skeleton className="h-10 w-full" />
                     </div>
                 ) : all.length === 0 ? (
-                    <p className="text-xs text-slate-500">
-                        No follow-up activity yet. Send a draft or add a note
-                        below.
+                    <p className="px-4 pb-3 text-center text-xs text-muted">
+                        No follow-ups yet. Send a draft or add a note below.
                     </p>
                 ) : (
-                    <ul className="space-y-2">
+                    <ul className="flex flex-col">
                         {all.slice(0, 6).map((entry) => (
                             <li
                                 key={entry.id}
-                                className="rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+                                className="grid grid-cols-[24px_1fr_auto] items-center gap-2.5 border-b border-border px-4 py-2.5 last:border-b-0"
                             >
-                                <div className="flex items-center justify-between gap-2 text-xs">
-                                    <Badge variant={entry.badgeVariant}>
-                                        {entry.label}
-                                    </Badge>
-                                    {entry.ts && (
-                                        <span className="text-slate-500">
-                                            {new Date(entry.ts).toLocaleString()}
-                                        </span>
+                                <span className="grid h-6 w-6 place-items-center rounded-md border border-border bg-surface-2 text-text-2">
+                                    {entry.kind === "message" ? (
+                                        <Mail className="h-3.5 w-3.5" aria-hidden />
+                                    ) : (
+                                        <StickyNote
+                                            className="h-3.5 w-3.5"
+                                            aria-hidden
+                                        />
                                     )}
+                                </span>
+                                <div className="min-w-0">
+                                    <div className="text-[13px] text-text">
+                                        {entry.title}
+                                    </div>
+                                    <div className="line-clamp-1 text-[11.5px] text-muted">
+                                        {entry.sub}
+                                    </div>
                                 </div>
-                                <p className="mt-1 line-clamp-3 text-slate-800">
-                                    {entry.text}
-                                </p>
+                                <span className="text-[11.5px] text-muted tabular-nums">
+                                    {timeAgo(entry.ts)}
+                                </span>
                             </li>
                         ))}
                     </ul>
                 )}
-                <div className="space-y-2">
-                    <label
-                        htmlFor="follow-up-note"
-                        className="text-xs font-semibold uppercase tracking-wide text-slate-500"
-                    >
-                        Add a note
-                    </label>
-                    <Textarea
-                        id="follow-up-note"
-                        rows={2}
+                <form
+                    onSubmit={onAdd}
+                    className="flex gap-2 border-t border-border px-4 py-3"
+                >
+                    <input
                         value={draftNote}
                         onChange={(e) => setDraftNote(e.target.value)}
-                        placeholder="What did you observe or decide?"
+                        placeholder="Add a note about this follow-up…"
+                        aria-label="Add a note"
+                        className="flex-1 rounded-md border border-border bg-surface px-2.5 py-1.5 text-xs text-text outline-none placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent-2"
                     />
-                    <div className="flex justify-end">
-                        <Button
-                            size="sm"
-                            onClick={onAdd}
-                            disabled={!draftNote.trim()}
-                        >
-                            Add note
-                        </Button>
-                    </div>
-                </div>
+                    <button
+                        type="submit"
+                        title="Add note"
+                        disabled={!draftNote.trim()}
+                        className="grid h-7 w-7 place-items-center rounded-md border border-border bg-surface text-text-2 transition-colors hover:bg-surface-2 hover:text-text disabled:opacity-40"
+                    >
+                        <Plus className="h-3.5 w-3.5" aria-hidden />
+                    </button>
+                </form>
             </CardContent>
         </Card>
     );

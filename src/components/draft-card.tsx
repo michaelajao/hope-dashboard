@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ThumbsDown, ThumbsUp } from "lucide-react";
+import { Info, ThumbsDown, ThumbsUp } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,11 +10,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { Draft } from "@/lib/api/commentGen";
 
+export type DraftContext = {
+    topFactors: string[];
+    lastActiveDays: number | null;
+    memoryUsed: boolean;
+    engagementUsed: boolean;
+};
+
 type DraftCardProps = {
     draft: Draft;
     onThumb: (draftId: string, label: "up" | "down") => void;
     onSend: (draftId: string, sentText: string, action: "accept" | "edit") => void;
     pending?: boolean;
+    context?: DraftContext;
 };
 
 const PERSONA_ACCENT: Record<string, string> = {
@@ -23,7 +31,13 @@ const PERSONA_ACCENT: Record<string, string> = {
     "Goal-oriented": "border-l-4 border-l-emerald-500",
 };
 
-export function DraftCard({ draft, onThumb, onSend, pending }: DraftCardProps) {
+export function DraftCard({
+    draft,
+    onThumb,
+    onSend,
+    pending,
+    context,
+}: DraftCardProps) {
     const [editing, setEditing] = useState(false);
     const [text, setText] = useState(draft.body);
     const [thumb, setThumb] = useState<"up" | "down" | null>(null);
@@ -148,6 +162,64 @@ export function DraftCard({ draft, onThumb, onSend, pending }: DraftCardProps) {
                         )}
                     </div>
                 </div>
+                {context && (
+                    <details className="text-xs text-muted">
+                        <summary className="inline-flex cursor-pointer select-none items-center gap-1.5 text-text-2">
+                            <Info className="h-3 w-3" aria-hidden />
+                            What this draft is based on
+                        </summary>
+                        <div className="mt-2 space-y-1 rounded-md border border-border bg-surface-2 p-2.5 leading-relaxed">
+                            <div>
+                                <span className="font-medium text-text-2">
+                                    Persona:
+                                </span>{" "}
+                                {draft.persona} — {draft.label}
+                            </div>
+                            {context.topFactors.length > 0 && (
+                                <div>
+                                    <span className="font-medium text-text-2">
+                                        Top signals:
+                                    </span>{" "}
+                                    {context.topFactors.slice(0, 2).join("; ")}
+                                </div>
+                            )}
+                            {context.lastActiveDays !== null && (
+                                <div>
+                                    <span className="font-medium text-text-2">
+                                        Last active:
+                                    </span>{" "}
+                                    {context.lastActiveDays === 0
+                                        ? "today"
+                                        : `${context.lastActiveDays} day${
+                                              context.lastActiveDays === 1
+                                                  ? ""
+                                                  : "s"
+                                          } ago`}
+                                </div>
+                            )}
+                            <div>
+                                <span className="font-medium text-text-2">
+                                    Memory hit:
+                                </span>{" "}
+                                {context.memoryUsed
+                                    ? "yes — prior posts retrieved"
+                                    : "no — cold-start"}
+                            </div>
+                            <div>
+                                <span className="font-medium text-text-2">
+                                    Engagement context:
+                                </span>{" "}
+                                {context.engagementUsed
+                                    ? "applied"
+                                    : "not available"}
+                            </div>
+                            <p className="mt-1.5 italic">
+                                Drafts are suggestions. Always review before
+                                sending.
+                            </p>
+                        </div>
+                    </details>
+                )}
             </CardContent>
         </Card>
     );

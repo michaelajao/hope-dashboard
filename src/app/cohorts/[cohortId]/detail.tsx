@@ -1,8 +1,10 @@
 "use client";
 
 import { useMemo } from "react";
+import { Clock, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
 import { RiskGauge } from "@/components/risk-gauge";
@@ -11,9 +13,11 @@ import { Avatar } from "@/components/avatar";
 import { InfoCardRow } from "@/components/info-card-row";
 import { AiSummaryCard } from "@/components/ai-summary-card";
 import { MetricGrid, MetricTile } from "@/components/metric-tile";
+import { DriverBars } from "@/components/driver-bars";
 import { useMemory, useParticipantPrediction } from "@/lib/hooks/api";
 import { syntheticHistory } from "@/lib/demo-events";
 import { useUiStore } from "@/lib/store/uiStore";
+import { useQueueStore } from "@/lib/store/queueStore";
 import { friendlyStatus } from "@/lib/risk";
 import {
     activationLevel,
@@ -27,12 +31,26 @@ import {
 
 export function Detail({ cohortId }: { cohortId: number }) {
     const selectedId = useUiStore((s) => s.selectedParticipantId);
+    const select = useUiStore((s) => s.selectParticipant);
+    const snooze = useQueueStore((s) => s.snooze);
+    const dismiss = useQueueStore((s) => s.dismiss);
     const history = useMemo(
         () => (selectedId ? syntheticHistory(selectedId) : null),
         [selectedId],
     );
     const prediction = useParticipantPrediction(history);
     const memory = useMemory(selectedId, cohortId);
+
+    function onSnooze() {
+        if (!selectedId) return;
+        snooze(selectedId, 7);
+        select(null);
+    }
+    function onDismiss() {
+        if (!selectedId) return;
+        dismiss(selectedId);
+        select(null);
+    }
 
     if (!selectedId) {
         return (
@@ -55,22 +73,44 @@ export function Detail({ cohortId }: { cohortId: number }) {
     return (
         <Card className="flex flex-col gap-3">
             <CardHeader>
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
                         <Avatar participantId={selectedId} size="lg" />
                         <div>
                             <CardTitle>{name}</CardTitle>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-muted">
                                 Cohort {cohortId} ·{" "}
-                                <span className="text-slate-700">
+                                <span className="text-text-2">
                                     {selectedId}
                                 </span>
                             </p>
                         </div>
                     </div>
-                    {status && (
-                        <Badge variant={status.badgeVariant}>{status.label}</Badge>
-                    )}
+                    <div className="flex items-center gap-2">
+                        {status && (
+                            <Badge variant={status.badgeVariant}>
+                                {status.label}
+                            </Badge>
+                        )}
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={onSnooze}
+                            className="gap-1.5"
+                        >
+                            <Clock className="h-3.5 w-3.5" aria-hidden />
+                            Snooze 7d
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={onDismiss}
+                            className="gap-1.5 text-risk-hi hover:bg-risk-hi-bg"
+                        >
+                            <X className="h-3.5 w-3.5" aria-hidden />
+                            Dismiss
+                        </Button>
+                    </div>
                 </div>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -110,14 +150,18 @@ export function Detail({ cohortId }: { cohortId: number }) {
 
                 {prediction.data?.contributing_factors?.length ? (
                     <div>
-                        <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">
                             Why {name} is highlighted
                         </h4>
-                        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
-                            {prediction.data.contributing_factors.map((f, i) => (
-                                <li key={i}>{f}</li>
-                            ))}
-                        </ul>
+                        <div className="mt-3">
+                            <DriverBars
+                                factors={prediction.data.contributing_factors}
+                                weights={
+                                    prediction.data.contributing_factor_weights
+                                }
+                                tone={prediction.data.risk_level}
+                            />
+                        </div>
                     </div>
                 ) : prediction.isLoading ? (
                     <div className="space-y-2">

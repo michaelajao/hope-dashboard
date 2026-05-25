@@ -24,7 +24,8 @@ The full design plan lives at `C:\Users\ajaoo\.claude\plans\temporal-conjuring-b
 | First adapter pushed | Done | `qwen3-0.6b-hope-only-lora` |
 | Dashboard upgraded next-auth v1 → v5 | Done | Local commit `863c812` — **not yet pushed** |
 | Dashboard boots locally + login works | Done | `npm run dev`, dev-allowlist gate |
-| **Dashboard UI polish (Step 9)** | **Done — uncommitted** | All Tier B features implemented; typecheck + lint clean |
+| **Dashboard UI polish (Step 9)** | Done | Pushed `d975e46` |
+| **Hybrid port from hope·move prototype (Step 10)** | **In progress** | 7 design moves cherry-picked from the standalone prototype in [docs/prototype/](prototype/) |
 | Adapter push — gemma + Qwen3-4B | Pending | Run when training finishes |
 | `scp` engagement_ml models + cumulative panel to laptop | Pending | Needed before Space deploys |
 | Deploy `hope-dropout-api` HF Space | Pending | Free CPU, Private |
@@ -54,6 +55,20 @@ The full design plan lives at `C:\Users\ajaoo\.claude\plans\temporal-conjuring-b
    - 9 new files in `src/components/` and `src/lib/`; 11 files edited. `npm run typecheck` + `npm run lint` clean.
 
 ## What's left
+
+### Step 10 — Hybrid port from the hope·move prototype (in flight)
+
+A standalone prototype lives at [docs/prototype/](prototype/) (HTML + React + concept PNG, mock-data only). We're cherry-picking 7 design moves while keeping all Step 9 layout + backend wiring. Full sub-step breakdown in the master plan at `C:\Users\ajaoo\.claude\plans\temporal-conjuring-blum.md` (§10). Status:
+
+- **10a** — oklch design tokens (replaces hope-purple/coral) — *in progress*
+- **10b** — slim topbar + `hope·move` wordmark + inline stats
+- **10c** — quantified driver bars in the risk card (needs engagement_ml to emit |SHAP| magnitudes alongside factor strings)
+- **10d** — "What this draft is based on" `<details>` disclosure under each DraftCard
+- **10e** — Snooze 7d / Dismiss queue actions, zustand-backed
+- **10f** — Merge "Recent activity" + "Add a note" into one card
+- **10g** — Live "contacted this session" stat in the topbar
+
+Out of scope: tone switcher (we keep 3 persona cards), removing the AI summary or info-cards row (boss wanted them).
 
 ### Immediate next steps (you, on Coventry HPC)
 

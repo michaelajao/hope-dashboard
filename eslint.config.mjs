@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored reference prototype — read-only, not part of the build.
+    "docs/prototype/**",
   ]),
 ]);
 

@@ -20,6 +20,7 @@ import type {
     ParticipantHistory,
     PredictionResponse,
 } from "@/lib/api/dropout";
+import { useSessionStatsStore } from "@/lib/store/sessionStatsStore";
 
 const ONE_DAY = 24 * 60 * 60 * 1000;
 const FIVE_MIN = 5 * 60 * 1000;
@@ -105,6 +106,10 @@ export function useEvent() {
         onSuccess: (_data, variables) => {
             // Invalidate memory so the freshly-sent reply appears next render.
             qc.invalidateQueries({ queryKey: ["memory"] });
+            // Bump the topbar's "contacted this session" stat on send paths.
+            if (variables.action === "accept" || variables.action === "edit") {
+                useSessionStatsStore.getState().incrementSent();
+            }
         },
     });
 }
