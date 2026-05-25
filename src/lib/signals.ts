@@ -105,7 +105,11 @@ export function engagementTrend(history: ParticipantHistory): EngagementTrend {
         if (ts >= recent && ts < end) r += 1;
         else if (ts >= prior && ts < recent) p += 1;
     }
-    if (p === 0 && r === 0) return "Stable";
+    // Both windows empty AND participant hasn't been seen recently —
+    // they're disengaged, not "stable at zero". Calling it Stable would
+    // misrepresent total silence in the metric tile.
+    if (p === 0 && r === 0)
+        return daysSinceLastEvent(history) >= 14 ? "Declining" : "Stable";
     if (p === 0) return r > 0 ? "Improving" : "Stable";
     const delta = (r - p) / p;
     if (delta < -0.15) return "Declining";
@@ -113,10 +117,25 @@ export function engagementTrend(history: ParticipantHistory): EngagementTrend {
     return "Stable";
 }
 
-const LOW_RX = /\b(few|inactive|silent|delayed|none|no |slow|down|low)\b/i;
-const HIGH_RX = /\b(strong|engaged|first day|consistent|active|rich)\b/i;
+/**
+ * Activation derives from the risk tier when one is available — High risk
+ * means the participant is barely engaging, so activation is Low. When no
+ * prediction is available (cold start, partial history) we fall back to
+ * scanning factor strings, but only with conservative high-confidence
+ * keywords; the prior `\b(active)\b` HIGH match was a false-positive trap
+ * because engagement_ml's "Returning across multiple days" factor reads as
+ * activity even for participants with declining engagement.
+ */
+const LOW_RX = /\b(few|inactive|silent|delayed|none|no |slow|down|low|stopped|gone)\b/i;
+const HIGH_RX = /\b(strong|engaged|first day|consistent|rich)\b/i;
 
-export function activationLevel(factors: string[]): ActivationLevel {
+export function activationLevel(
+    factors: string[],
+    riskLevel?: RiskLevel | null,
+): ActivationLevel {
+    if (riskLevel === "high") return "Low";
+    if (riskLevel === "medium") return "Medium";
+    if (riskLevel === "low") return "High";
     if (factors.some((f) => HIGH_RX.test(f))) return "High";
     if (factors.some((f) => LOW_RX.test(f))) return "Low";
     return "Medium";
@@ -167,7 +186,7 @@ export function buildSnapshot(
         engagementTrend: engagementTrend(history),
         facilitatorContact: facilitatorContactCount(history),
         distinctActivityTypes14d: distinctActivityTypes(history, 14),
-        activation: activationLevel(factors),
+        activation: activationLevel(factors, riskLevel),
         riskLevel,
     };
 }

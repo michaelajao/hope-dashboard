@@ -43,3 +43,13 @@ next-env.d.ts
 
 # Dev server transient log
 dev-server.log
+
+.playwright-mcp/
+
+# Ad-hoc Playwright screenshots and scratch
+viewport-*.png
+final-*.png
+final2-*.png
+cohort-*.png
+hope-move dashboard.zip
+docs/plan.md

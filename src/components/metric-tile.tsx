@@ -13,9 +13,9 @@ type MetricTileProps = {
 };
 
 const DELTA_TONE: Record<Tone, string> = {
-    neutral: "text-slate-500",
-    positive: "text-emerald-600",
-    negative: "text-rose-600",
+    neutral: "text-muted",
+    positive: "text-risk-lo",
+    negative: "text-risk-hi",
 };
 
 export function MetricTile({
@@ -27,10 +27,10 @@ export function MetricTile({
     return (
         <Card>
             <CardContent>
-                <div className="text-xs uppercase tracking-wide text-slate-500">
+                <div className="text-xs uppercase tracking-wide text-muted">
                     {label}
                 </div>
-                <div className="mt-1 text-base font-semibold text-slate-900">
+                <div className="mt-1 text-base font-semibold text-text">
                     {value}
                 </div>
                 {delta && (

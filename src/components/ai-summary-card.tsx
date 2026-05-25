@@ -33,7 +33,7 @@ export function AiSummaryCard({ history, prediction }: AiSummaryCardProps) {
                 </div>
             </CardHeader>
             <CardContent>
-                <p className="text-sm leading-relaxed text-slate-700">
+                <p className="text-sm leading-relaxed text-text-2">
                     {paragraph}
                 </p>
             </CardContent>

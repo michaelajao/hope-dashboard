@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,13 @@ import {
     useParticipantPrediction,
     useThumb,
 } from "@/lib/hooks/api";
-import { demoEngagementContext, syntheticHistory } from "@/lib/demo-events";
+import {
+    demoEngagementContext,
+    syntheticHistory,
+    weekNumber,
+} from "@/lib/demo-events";
+import { seedDemoMemory } from "@/lib/demo-memory";
+import { getDemoProfile } from "@/lib/profile";
 import { useUiStore } from "@/lib/store/uiStore";
 import { RECOMMENDED_APPROACH_BULLETS } from "@/lib/risk";
 import { daysSinceLastEvent } from "@/lib/signals";
@@ -59,6 +65,15 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
     const thumb = useThumb();
     const event = useEvent();
 
+    // Best-effort: seed two plausible prior posts the first time we open
+    // this participant's panel, so the next /generate has real memory to
+    // retrieve. Idempotent (de-duped inside seedDemoMemory) and silent on
+    // failure (comment-gen offline = no-op).
+    useEffect(() => {
+        if (!selectedId) return;
+        seedDemoMemory(selectedId, cohort.id, cohort.moduleId);
+    }, [selectedId, cohort.id, cohort.moduleId]);
+
     if (!selectedId) {
         return (
             <Card className="flex items-center justify-center">
@@ -73,16 +88,19 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
     }
 
     function onGenerate() {
+        if (!selectedId) return;
         setError(null);
+        const profile = getDemoProfile(selectedId);
         const body: GenerateRequest = {
             participant_id: Number(
                 String(selectedId).replace(/[^0-9]/g, "") || "0",
             ),
             cohort_id: cohort.id,
             module_id: cohort.moduleId,
+            week_number: weekNumber(history),
             activity_type: activityType,
             post_text: postText,
-            display_name: String(selectedId),
+            display_name: profile.displayName,
             engagement: prediction.data
                 ? {
                       dropout_risk: prediction.data.dropout_risk,
@@ -128,7 +146,7 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
             </CardHeader>
             <CardContent className="space-y-4">
                 <div className="space-y-2">
-                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-muted">
                         Activity type
                     </label>
                     <Select
@@ -145,7 +163,7 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                     </Select>
                 </div>
                 <div className="space-y-2">
-                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-muted">
                         Participant post
                     </label>
                     <Textarea
@@ -164,12 +182,12 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                 </Button>
 
                 {response?.safety_signposting && (
-                    <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    <div className="rounded-md border border-risk-md bg-risk-md-bg px-3 py-2 text-xs text-risk-md">
                         {response.safety_signposting}
                     </div>
                 )}
                 {error && (
-                    <p className="text-xs text-rose-600">{error}</p>
+                    <p className="text-xs text-risk-hi">{error}</p>
                 )}
 
                 {generate.isPending && (
@@ -181,15 +199,19 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                 )}
 
                 {response?.drafts.map((d) => {
+                    const profile = selectedId
+                        ? getDemoProfile(selectedId)
+                        : null;
                     const ctx: DraftContext | undefined = response
                         ? {
-                              topFactors:
-                                  prediction.data?.contributing_factors ?? [],
+                              topFactors: prediction.data?.contributing_factors ?? [],
                               lastActiveDays: history
                                   ? daysSinceLastEvent(history)
                                   : null,
                               memoryUsed: Boolean(response.memory_used),
                               engagementUsed: Boolean(response.engagement_used),
+                              displayName: profile?.displayName,
+                              bio: profile?.bio || undefined,
                           }
                         : undefined;
                     return (
@@ -203,13 +225,12 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                         />
                     );
                 })}
-
                 {response && (
-                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                        <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <div className="rounded-lg border border-border bg-surface-2 px-3 py-2">
+                        <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">
                             Recommended approach
                         </h4>
-                        <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-slate-700">
+                        <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-text-2">
                             {RECOMMENDED_APPROACH_BULLETS.map((b) => (
                                 <li key={b}>{b}</li>
                             ))}

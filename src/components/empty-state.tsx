@@ -10,10 +10,10 @@ export function EmptyState({
     children?: ReactNode;
 }) {
     return (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white px-6 py-10 text-center">
-            <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-surface px-6 py-10 text-center">
+            <h3 className="text-sm font-semibold text-text">{title}</h3>
             {description && (
-                <p className="mt-1 max-w-sm text-xs text-slate-500">
+                <p className="mt-1 max-w-sm text-xs text-muted">
                     {description}
                 </p>
             )}

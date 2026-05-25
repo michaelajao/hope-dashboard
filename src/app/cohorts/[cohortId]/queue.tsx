@@ -78,12 +78,17 @@ export function Queue({ cohort }: { cohort: CohortMeta }) {
                         onChange={(e) => setQuery(e.target.value)}
                         aria-label="Search participants"
                     />
-                    <div className="flex flex-wrap gap-1">
+                    <div
+                        className="flex flex-wrap gap-1"
+                        role="group"
+                        aria-label="Filter queue by status"
+                    >
                         {FILTERS.map((f) => (
                             <Button
                                 key={f}
                                 size="sm"
                                 variant={filter === f ? "primary" : "ghost"}
+                                aria-pressed={filter === f}
                                 onClick={() => setFilter(f)}
                             >
                                 {QUEUE_PILL_LABELS[f]}

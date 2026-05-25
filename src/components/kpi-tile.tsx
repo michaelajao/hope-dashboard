@@ -12,17 +12,17 @@ type KpiTileProps = {
 };
 
 const ACCENT: Record<NonNullable<KpiTileProps["accent"]>, string> = {
-    neutral: "text-slate-900",
-    low: "text-emerald-600",
-    medium: "text-amber-600",
-    high: "text-rose-600",
+    neutral: "text-text",
+    low: "text-risk-lo",
+    medium: "text-risk-md",
+    high: "text-risk-hi",
 };
 
 const ICON_BG: Record<NonNullable<KpiTileProps["accent"]>, string> = {
-    neutral: "bg-slate-100 text-slate-600",
-    low: "bg-emerald-100 text-emerald-600",
-    medium: "bg-amber-100 text-amber-600",
-    high: "bg-rose-100 text-rose-600",
+    neutral: "bg-surface-2 text-text-2",
+    low: "bg-risk-lo-bg text-risk-lo",
+    medium: "bg-risk-md-bg text-risk-md",
+    high: "bg-risk-hi-bg text-risk-hi",
 };
 
 export function KpiTile({
@@ -47,7 +47,7 @@ export function KpiTile({
                         </span>
                     )}
                     <div className="min-w-0">
-                        <div className="text-xs uppercase tracking-wide text-slate-500">
+                        <div className="text-xs uppercase tracking-wide text-muted">
                             {label}
                         </div>
                         <div
@@ -59,7 +59,7 @@ export function KpiTile({
                             {value}
                         </div>
                         {hint && (
-                            <div className="mt-1 text-xs text-slate-500">
+                            <div className="mt-1 text-xs text-muted">
                                 {hint}
                             </div>
                         )}

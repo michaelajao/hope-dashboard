@@ -86,9 +86,12 @@ export function Detail({ cohortId }: { cohortId: number }) {
                             </p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
                         {status && (
-                            <Badge variant={status.badgeVariant}>
+                            <Badge
+                                variant={status.badgeVariant}
+                                className="whitespace-nowrap"
+                            >
                                 {status.label}
                             </Badge>
                         )}
@@ -96,7 +99,7 @@ export function Detail({ cohortId }: { cohortId: number }) {
                             variant="secondary"
                             size="sm"
                             onClick={onSnooze}
-                            className="gap-1.5"
+                            className="gap-1.5 whitespace-nowrap"
                         >
                             <Clock className="h-3.5 w-3.5" aria-hidden />
                             Snooze 7d
@@ -105,7 +108,7 @@ export function Detail({ cohortId }: { cohortId: number }) {
                             variant="ghost"
                             size="sm"
                             onClick={onDismiss}
-                            className="gap-1.5 text-risk-hi hover:bg-risk-hi-bg"
+                            className="gap-1.5 whitespace-nowrap text-risk-hi hover:bg-risk-hi-bg"
                         >
                             <X className="h-3.5 w-3.5" aria-hidden />
                             Dismiss
@@ -114,8 +117,8 @@ export function Detail({ cohortId }: { cohortId: number }) {
                 </div>
             </CardHeader>
             <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-[200px_1fr]">
-                    <div className="flex justify-center md:justify-start">
+                <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start sm:gap-6">
+                    <div className="shrink-0">
                         {prediction.isLoading ? (
                             <Skeleton className="h-24 w-40" />
                         ) : prediction.data ? (
@@ -125,14 +128,35 @@ export function Detail({ cohortId }: { cohortId: number }) {
                             />
                         ) : null}
                     </div>
-                    <div>
-                        {prediction.data ? (
-                            <InfoCardRow prediction={prediction.data} />
-                        ) : prediction.isLoading ? (
-                            <Skeleton className="h-24 w-full" />
-                        ) : null}
-                    </div>
+                    {prediction.data?.contributing_factors?.length ? (
+                        <div className="min-w-0 flex-1">
+                            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">
+                                Why {name} is highlighted
+                            </h4>
+                            <div className="mt-3">
+                                <DriverBars
+                                    factors={
+                                        prediction.data.contributing_factors
+                                    }
+                                    weights={
+                                        prediction.data
+                                            .contributing_factor_weights
+                                    }
+                                    tone={prediction.data.risk_level}
+                                />
+                            </div>
+                        </div>
+                    ) : prediction.isLoading ? (
+                        <div className="min-w-0 flex-1 space-y-2">
+                            <Skeleton className="h-4 w-full" />
+                            <Skeleton className="h-4 w-3/4" />
+                        </div>
+                    ) : null}
                 </div>
+
+                {prediction.data && (
+                    <InfoCardRow prediction={prediction.data} />
+                )}
 
                 {prediction.data && history && (
                     <AiSummaryCard
@@ -145,37 +169,16 @@ export function Detail({ cohortId }: { cohortId: number }) {
                     <DetailMetrics
                         history={history}
                         factors={prediction.data.contributing_factors}
+                        riskLevel={prediction.data.risk_level}
                     />
                 )}
 
-                {prediction.data?.contributing_factors?.length ? (
-                    <div>
-                        <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">
-                            Why {name} is highlighted
-                        </h4>
-                        <div className="mt-3">
-                            <DriverBars
-                                factors={prediction.data.contributing_factors}
-                                weights={
-                                    prediction.data.contributing_factor_weights
-                                }
-                                tone={prediction.data.risk_level}
-                            />
-                        </div>
-                    </div>
-                ) : prediction.isLoading ? (
-                    <div className="space-y-2">
-                        <Skeleton className="h-4 w-full" />
-                        <Skeleton className="h-4 w-3/4" />
-                    </div>
-                ) : null}
-
                 {prediction.data?.recommended_actions?.length ? (
                     <div>
-                        <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">
                             Recommended actions
                         </h4>
-                        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
+                        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-text-2">
                             {prediction.data.recommended_actions.map((a, i) => (
                                 <li key={i}>{a}</li>
                             ))}
@@ -184,7 +187,7 @@ export function Detail({ cohortId }: { cohortId: number }) {
                 ) : null}
 
                 <div>
-                    <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">
                         Recent activity
                     </h4>
                     {memory.isLoading ? (
@@ -197,9 +200,9 @@ export function Detail({ cohortId }: { cohortId: number }) {
                             {memory.data.slice(0, 5).map((m) => (
                                 <li
                                     key={m.memory_id}
-                                    className="rounded border border-slate-200 bg-slate-50 px-3 py-2"
+                                    className="rounded border border-border bg-surface-2 px-3 py-2"
                                 >
-                                    <div className="flex items-center justify-between text-xs text-slate-500">
+                                    <div className="flex items-center justify-between text-xs text-muted">
                                         <span className="capitalize">
                                             {(m.role ?? "entry").replace(
                                                 "_",
@@ -215,14 +218,14 @@ export function Detail({ cohortId }: { cohortId: number }) {
                                             </span>
                                         )}
                                     </div>
-                                    <p className="mt-1 line-clamp-3 text-slate-800">
+                                    <p className="mt-1 line-clamp-3 text-text">
                                         {m.text}
                                     </p>
                                 </li>
                             ))}
                         </ul>
                     ) : (
-                        <p className="mt-2 text-sm text-slate-500">
+                        <p className="mt-2 text-sm text-muted">
                             No prior activity for this participant in this cohort.
                         </p>
                     )}
@@ -235,16 +238,18 @@ export function Detail({ cohortId }: { cohortId: number }) {
 function DetailMetrics({
     history,
     factors,
+    riskLevel,
 }: {
     history: ReturnType<typeof syntheticHistory>;
     factors: string[];
+    riskLevel: "low" | "medium" | "high";
 }) {
     const lastActiveDays = daysSinceLastEvent(history);
     const discussion = eventsLastNDays(history, "discussion_post", 14);
     const types = distinctActivityTypes(history, 14);
     const facilitatorTouches = facilitatorContactCount(history);
     const trend = engagementTrend(history);
-    const activation = activationLevel(factors);
+    const activation = activationLevel(factors, riskLevel);
 
     const lastActiveTone =
         lastActiveDays === 0

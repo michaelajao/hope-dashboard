@@ -3,13 +3,20 @@
  * hooks), and zero extra network calls — the detail panel renders the
  * paragraph the moment the prediction lands.
  *
+ * The trend clause leads with the dominant signal:
+ *   - silent throughout: "has not started engaging"
+ *   - dropped to zero recently: "has gone quiet"
+ *   - otherwise: the trend window comparison
+ *
  * Swap to a model-generated summary later by replacing buildSummary's
  * return value; the calling component contract stays the same.
  */
 
 import type { SignalSnapshot } from "@/lib/signals";
 
-function trendClause(snap: SignalSnapshot): string {
+function leadingClause(snap: SignalSnapshot): string {
+    if (snap.daysSinceLastLogin >= 21)
+        return "has gone quiet — no recent activity at all";
     if (snap.engagementTrend === "Declining")
         return "has declined over the past two weeks";
     if (snap.engagementTrend === "Improving")
@@ -46,7 +53,7 @@ function outreachClause(snap: SignalSnapshot): string {
 }
 
 export function buildSummary(name: string, snap: SignalSnapshot): string {
-    const sentence1 = `${name}'s engagement ${trendClause(snap)}.`;
+    const sentence1 = `${name}'s engagement ${leadingClause(snap)}.`;
     const sentence2 =
         snap.daysSinceLastLogin >= 3
             ? `${capitalize(loginClause(snap))} and ${discussionClause(snap)}.`

@@ -18,10 +18,12 @@ export default async function CohortDashboard({
     return (
         <main className="flex w-full flex-1 flex-col">
             <Topbar cohort={cohort} />
-            <div className="grid flex-1 grid-cols-1 gap-4 px-5 py-4 lg:grid-cols-[20rem_1fr_24rem]">
+            <div className="grid flex-1 grid-cols-1 gap-4 px-4 py-4 sm:px-5 lg:grid-cols-[18rem_1fr] xl:grid-cols-[18rem_1fr_22rem]">
                 <Queue cohort={cohort} />
                 <Detail cohortId={cohort.id} />
-                <Drafts cohort={cohort} />
+                <div className="lg:col-span-full xl:col-span-1">
+                    <Drafts cohort={cohort} />
+                </div>
             </div>
         </main>
     );

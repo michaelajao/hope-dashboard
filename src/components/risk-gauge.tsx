@@ -7,9 +7,9 @@ type RiskGaugeProps = {
 };
 
 const COLOR: Record<RiskGaugeProps["level"], string> = {
-    low: "stroke-emerald-500",
-    medium: "stroke-amber-500",
-    high: "stroke-rose-600",
+    low: "stroke-risk-lo",
+    medium: "stroke-risk-md",
+    high: "stroke-risk-hi",
 };
 
 export function RiskGauge({ value, level, size = 160 }: RiskGaugeProps) {
@@ -30,7 +30,7 @@ export function RiskGauge({ value, level, size = 160 }: RiskGaugeProps) {
             >
                 <path
                     d={`M ${cx - radius} ${cy} A ${radius} ${radius} 0 0 1 ${cx + radius} ${cy}`}
-                    className="fill-none stroke-slate-200"
+                    className="fill-none stroke-border"
                     strokeWidth={12}
                     strokeLinecap="round"
                 />
@@ -45,12 +45,12 @@ export function RiskGauge({ value, level, size = 160 }: RiskGaugeProps) {
                     x={cx}
                     y={cy - 4}
                     textAnchor="middle"
-                    className="fill-slate-900 text-2xl font-semibold"
+                    className="fill-text text-2xl font-semibold"
                 >
                     {(clamped * 100).toFixed(0)}%
                 </text>
             </svg>
-            <div className="text-xs uppercase tracking-wide text-slate-500">
+            <div className="text-xs uppercase tracking-wide text-muted">
                 {level} risk
             </div>
         </div>

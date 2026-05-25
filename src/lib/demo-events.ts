@@ -161,25 +161,75 @@ export function demoEngagementContext(history: ParticipantHistory | null) {
     const lastLogin = [...sorted]
         .reverse()
         .find((e) => e.event_type === "login");
-    const cumLogins = sorted.filter((e) => e.event_type === "login").length;
+    const lastActivity = [...sorted]
+        .reverse()
+        .find((e) => e.event_type === "activity");
 
+    const cumLogins = sorted.filter((e) => e.event_type === "login").length;
+    const cumActivities = sorted.filter(
+        (e) => e.event_type === "activity",
+    ).length;
+    const uniquePages = new Set(
+        sorted
+            .filter((e) => e.event_type === "page_visit")
+            .map((e, i) => `p${i}`),
+    ).size;
+
+    const start_ms = new Date(history.effective_start).getTime();
     const score_at_ms = addDays(
         new Date(history.effective_start),
         history.score_at_day,
     ).getTime();
+    const dayMs = 86_400_000;
+    const firstWeekEnd = start_ms + 7 * dayMs;
+    const wroteFirstWeek = sorted.some(
+        (e) =>
+            e.event_type === "activity" &&
+            new Date(e.timestamp).getTime() < firstWeekEnd,
+    );
+
+    // engagement_slope: simple sign-of-difference between first-half and
+    // second-half event counts. Positive = climbing, negative = declining.
+    // The model only needs a directional cue, not a precise OLS fit.
+    const halfMs = (score_at_ms - start_ms) / 2;
+    const half = start_ms + halfMs;
+    let firstHalf = 0;
+    let secondHalf = 0;
+    for (const e of sorted) {
+        const ts = new Date(e.timestamp).getTime();
+        if (ts < half) firstHalf += 1;
+        else secondHalf += 1;
+    }
+    const denom = Math.max(firstHalf, 1);
+    const engagementSlope = (secondHalf - firstHalf) / denom;
 
     const daysSince = (ts: string) =>
-        Math.max(0, Math.floor((score_at_ms - new Date(ts).getTime()) / 86_400_000));
+        Math.max(0, Math.floor((score_at_ms - new Date(ts).getTime()) / dayMs));
 
     return {
-        current_inactive_streak: last ? daysSince(last.timestamp) : history.score_at_day,
         days_since_last_login: lastLogin
             ? daysSince(lastLogin.timestamp)
             : history.score_at_day,
+        days_since_last_activity: lastActivity
+            ? daysSince(lastActivity.timestamp)
+            : history.score_at_day,
+        current_inactive_streak: last
+            ? daysSince(last.timestamp)
+            : history.score_at_day,
         cum_login_count: cumLogins,
-        // engagement_slope intentionally omitted — needs a regression we
-        // don't want to do in the browser. Pass undefined; comment-gen
-        // copes.
-        engagement_slope: undefined as number | undefined,
+        cum_activity_count: cumActivities,
+        cum_unique_pages: uniquePages,
+        wrote_first_week_binary: (wroteFirstWeek ? 1 : 0) as 0 | 1,
+        engagement_slope: engagementSlope,
     };
+}
+
+/**
+ * Week number (1-based) within the participant's programme, derived from
+ * `score_at_day`. Useful for the comment-gen prompt so the model knows
+ * "this is week 6 messaging" vs "this is week 1 onboarding".
+ */
+export function weekNumber(history: ParticipantHistory | null): number | undefined {
+    if (!history) return undefined;
+    return Math.max(1, Math.ceil(history.score_at_day / 7));
 }
