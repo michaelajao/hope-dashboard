@@ -3,13 +3,13 @@ import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/auth";
 import { ApiError } from "@/lib/api/client";
 import { dropoutApi } from "@/lib/api/server";
-import type { ParticipantFeatures } from "@/lib/api/dropout";
+import type { ParticipantHistory } from "@/lib/api/dropout";
 
 export async function POST(req: NextRequest) {
     const session = await auth();
     if (!session) return new NextResponse("Unauthorized", { status: 401 });
     try {
-        const body = (await req.json()) as ParticipantFeatures;
+        const body = (await req.json()) as ParticipantHistory;
         const data = await dropoutApi().predict(body);
         return NextResponse.json(data);
     } catch (err) {

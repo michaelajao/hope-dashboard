@@ -7,9 +7,23 @@ export type ApiClientOptions = {
     /**
      * Hex-encoded HMAC-SHA256 signature provider. Returns the signature for
      * a given raw body. Server-side only; never invoke from a browser
-     * environment.
+     * environment. Used by the comment-gen backend, which enforces HMAC
+     * via `HOPE_API_SECRET`.
      */
     sign?: (body: string) => Promise<string>;
+    /**
+     * Shared API key sent as `X-API-Key`. Server-side only. Used by the
+     * engagement_ml risk-prediction backend, which enforces a single
+     * shared bearer token rather than HMAC.
+     */
+    apiKey?: string;
+    /**
+     * Hugging Face token sent as `Authorization: Bearer <token>` on every
+     * request. Required for invoking *private* HF Spaces; the HF gateway
+     * rejects unauthenticated requests at the network edge before they
+     * reach the application. Server-side only.
+     */
+    authToken?: string;
     /**
      * Forwarded session cookie when calling read endpoints from the
      * Next.js Route Handler proxy.
@@ -34,7 +48,16 @@ type RequestOptions = {
     path: string;
     query?: Record<string, string | number | undefined>;
     body?: unknown;
-    /** When true, attach the HMAC signature header. */
+    /**
+     * Auth requirement for this request. `"hmac"` triggers `X-HMAC-Signature`
+     * (comment-gen contract); `"apiKey"` triggers `X-API-Key`
+     * (engagement_ml risk-prediction contract); `false`/omitted means the
+     * endpoint is public (e.g. `/health`). The HF gateway `Authorization`
+     * header is attached automatically whenever the client was built with
+     * `authToken`.
+     */
+    auth?: "hmac" | "apiKey" | false;
+    /** Back-compat alias for `auth: "hmac"`. */
     signed?: boolean;
 };
 
@@ -46,7 +69,8 @@ export function createClient(opts: ApiClientOptions) {
         path,
         query,
         body,
-        signed = false,
+        signed,
+        auth,
     }: RequestOptions): Promise<T> {
         const url = new URL(path, opts.baseUrl);
         if (query) {
@@ -61,11 +85,23 @@ export function createClient(opts: ApiClientOptions) {
             rawBody = JSON.stringify(body);
             headers["Content-Type"] = "application/json";
         }
-        if (signed) {
+        const effectiveAuth = auth ?? (signed ? "hmac" : false);
+        if (effectiveAuth === "hmac") {
             if (!opts.sign) {
-                throw new Error("signed request requires `sign` option");
+                throw new Error("HMAC request requires `sign` option");
             }
             headers["X-HMAC-Signature"] = await opts.sign(rawBody ?? "");
+        } else if (effectiveAuth === "apiKey") {
+            if (!opts.apiKey) {
+                throw new Error("API-key request requires `apiKey` option");
+            }
+            headers["X-API-Key"] = opts.apiKey;
+        }
+        if (opts.authToken) {
+            // HF private-Space gateway gate. Attached on every request,
+            // including unauthenticated /health, because HF rejects at the
+            // edge before the application sees the request.
+            headers["Authorization"] = `Bearer ${opts.authToken}`;
         }
         if (opts.cookie) {
             headers["Cookie"] = opts.cookie;

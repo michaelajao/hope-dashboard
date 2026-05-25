@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { QueueItem } from "@/components/queue-item";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCohortBatch } from "@/lib/hooks/api";
-import { syntheticBatch } from "@/lib/demo-features";
+import { syntheticBatch } from "@/lib/demo-events";
 import { useUiStore } from "@/lib/store/uiStore";
 import type { CohortMeta } from "@/lib/cohorts";
 import type { RiskLevel } from "@/lib/api/dropout";
@@ -16,11 +16,11 @@ import type { RiskLevel } from "@/lib/api/dropout";
 const FILTERS: Array<RiskLevel | "all"> = ["all", "high", "medium", "low"];
 
 export function Queue({ cohort }: { cohort: CohortMeta }) {
-    const features = useMemo(
+    const histories = useMemo(
         () => syntheticBatch(cohort.demoParticipants),
         [cohort.demoParticipants],
     );
-    const { data, isLoading, error } = useCohortBatch(features);
+    const { data, isLoading, error } = useCohortBatch(histories);
     const selectedId = useUiStore((s) => s.selectedParticipantId);
     const select = useUiStore((s) => s.selectParticipant);
     const [filter, setFilter] = useState<RiskLevel | "all">("all");

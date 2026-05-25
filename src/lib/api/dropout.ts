@@ -1,13 +1,18 @@
 /**
- * Typed client for the dropout_ml_v2 FastAPI service.
+ * Typed client for the engagement_ml FastAPI service (dropout risk).
  *
- * Source: dropout_ml_v2/deploy/api/main.py
- * Default base URL: http://localhost:8000
+ * Source: engagement_ml/deploy/api/main.py + schemas.py
+ * Backend lives on a private HF Space; gated by X-API-Key (HOPE_RISK_API_KEY)
+ * plus the HF Space `Authorization: Bearer <HF_TOKEN>` gateway gate.
  *
- * Note: dropout predictions are recomputed on a weekly cadence
- * per (participant, week_number); cached by the service for the week.
- * Do not poll this client every render — cache by participant_id at the
- * dashboard layer (TanStack Query staleTime: 1 day).
+ * Wire-level contract is the event-record / ParticipantHistory shape from
+ * engagement_ml. The dashboard-friendly response aliases (`dropout_risk`,
+ * `risk_level`, `contributing_factors`, `recommended_actions`) are emitted
+ * server-side by engagement_ml's `score_one` / `score_many` so this client
+ * can render them directly without a per-call adapter.
+ *
+ * Cache predictions at the dashboard layer via TanStack Query
+ * (`staleTime: 1 day`) — risk scores update on a weekly cadence.
  */
 
 import { createClient, type ApiClientOptions } from "./client";
@@ -17,74 +22,138 @@ const DEFAULT_BASE_URL =
 
 export type RiskLevel = "low" | "medium" | "high";
 
-export type ParticipantFeatures = {
-    participant_id: string;
-    features: Record<string, number>;
+/**
+ * A single platform event. Mirrors `EventRecord` in
+ * engagement_ml/deploy/api/schemas.py. Timestamps must fall in
+ * `[effective_start, effective_start + score_at_day)` on the parent
+ * history; the backend rejects out-of-window events with a 422.
+ */
+export type EventRecord = {
+    timestamp: string; // ISO-8601
+    event_type:
+        | "activity"
+        | "login"
+        | "page_visit"
+        | "bookmark"
+        | "discussion_post"
+        | "facilitator_comment";
+    activity_type?: string;
+    words_written?: number;
+    description?: string;
 };
 
+/**
+ * One participant's raw event history at score-time.
+ *
+ * Cohort-context fields (`cohort_size`, `cohort_facilitator_density`) are
+ * supplied by the caller because engagement_ml's training-time
+ * `cohort_facilitator_density_loo` is a leave-one-out within-cohort
+ * average; at inference we use the caller-supplied value directly.
+ */
+export type ParticipantHistory = {
+    participant_id: string;
+    effective_start: string; // ISO-8601
+    events: EventRecord[];
+    cohort_size: number;
+    cohort_facilitator_density: number;
+    programme_length_days: number;
+    score_at_day: number;
+};
+
+export type BatchEventRequest = {
+    participants: ParticipantHistory[];
+};
+
+/**
+ * Per-participant prediction. engagement_ml emits both its native fields
+ * (`dropout_probability`, `risk_tier`) AND the dashboard-friendly aliases
+ * (`dropout_risk`, `risk_level`) with identical values, plus
+ * `contributing_factors` (TreeSHAP or rule-based) and `recommended_actions`
+ * (tier-keyed playbook).
+ */
 export type PredictionResponse = {
     participant_id: string;
+
+    // Native engagement_ml fields.
+    dropout_probability: number;
+    raw_probability: number;
+    risk_tier: RiskLevel;
+    threshold_used: number;
+    threshold_low: number;
+    threshold_high: number;
+    model_version: string;
+    horizon_used: number;
+    programme_length_days: number;
+    score_at_day: number;
+    anchored_to_days: string;
+    note?: string | null;
+
+    // Dashboard contract aliases (same values as the native fields).
     dropout_risk: number;
     risk_level: RiskLevel;
     contributing_factors: string[];
     recommended_actions: string[];
-    scored_at: string;
-};
-
-export type BatchRequest = {
-    participants: ParticipantFeatures[];
 };
 
 export type BatchResponse = {
     total: number;
-    high_risk_count: number;
-    medium_risk_count: number;
-    low_risk_count: number;
+    high: number;
+    medium: number;
+    low: number;
     predictions: PredictionResponse[];
-    scored_at: string;
 };
 
 export type DropoutHealth = {
-    status: string;
-    model_loaded: boolean;
-    shap_available: boolean;
-    timestamp: string;
+    status: "ok";
+    horizons: number[];
+    winner_architecture: string;
+};
+
+export type ModelInfoHorizon = {
+    T: number;
+    model_version: string;
+    decision_threshold_raw: number;
+    metrics: Record<string, unknown>;
 };
 
 export type ModelInfo = {
-    model_type: string;
-    loaded_at: string;
-    file: string;
-    n_features: number;
-    features: string[];
+    winner_architecture: string;
+    horizons: ModelInfoHorizon[];
+    training_period: string;
+    n_train: number;
+    n_test: number;
+    citation: string;
+    limitations: string[];
 };
 
 export function createDropoutClient(opts: Partial<ApiClientOptions> = {}) {
     const { request } = createClient({
         baseUrl: opts.baseUrl ?? DEFAULT_BASE_URL,
-        sign: opts.sign,
+        apiKey: opts.apiKey,
+        authToken: opts.authToken,
         cookie: opts.cookie,
         fetchImpl: opts.fetchImpl,
     });
 
     return {
         health: () => request<DropoutHealth>({ path: "/health" }),
-        modelInfo: () => request<ModelInfo>({ path: "/model/info" }),
+        modelInfo: () =>
+            request<ModelInfo>({ path: "/model/info", auth: "apiKey" }),
 
-        predict: (body: ParticipantFeatures) =>
+        predict: (body: ParticipantHistory) =>
             request<PredictionResponse>({
                 method: "POST",
                 path: "/predict",
                 body,
-                signed: true,
+                auth: "apiKey",
             }),
 
-        batch: (body: BatchRequest) =>
+        batch: (body: BatchEventRequest) =>
             request<BatchResponse>({
                 method: "POST",
                 path: "/batch",
                 body,
-                signed: true,
+                auth: "apiKey",
             }),
     };
 }

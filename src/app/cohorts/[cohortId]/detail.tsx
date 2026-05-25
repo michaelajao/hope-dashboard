@@ -8,16 +8,16 @@ import { EmptyState } from "@/components/empty-state";
 import { RiskGauge } from "@/components/risk-gauge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMemory, useParticipantPrediction } from "@/lib/hooks/api";
-import { syntheticFeatures } from "@/lib/demo-features";
+import { syntheticHistory } from "@/lib/demo-events";
 import { useUiStore } from "@/lib/store/uiStore";
 
 export function Detail({ cohortId }: { cohortId: number }) {
     const selectedId = useUiStore((s) => s.selectedParticipantId);
-    const features = useMemo(
-        () => (selectedId ? syntheticFeatures(selectedId) : null),
+    const history = useMemo(
+        () => (selectedId ? syntheticHistory(selectedId) : null),
         [selectedId],
     );
-    const prediction = useParticipantPrediction(features);
+    const prediction = useParticipantPrediction(history);
     const memory = useMemory(selectedId, cohortId);
 
     if (!selectedId) {

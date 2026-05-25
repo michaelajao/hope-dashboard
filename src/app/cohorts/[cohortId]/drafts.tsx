@@ -21,7 +21,7 @@ import {
     useParticipantPrediction,
     useThumb,
 } from "@/lib/hooks/api";
-import { syntheticFeatures } from "@/lib/demo-features";
+import { demoEngagementContext, syntheticHistory } from "@/lib/demo-events";
 import { useUiStore } from "@/lib/store/uiStore";
 import type { CohortMeta } from "@/lib/cohorts";
 import type {
@@ -41,11 +41,11 @@ const FACILITATOR_ID = "demo-facilitator";
 
 export function Drafts({ cohort }: { cohort: CohortMeta }) {
     const selectedId = useUiStore((s) => s.selectedParticipantId);
-    const features = useMemo(
-        () => (selectedId ? syntheticFeatures(selectedId) : null),
+    const history = useMemo(
+        () => (selectedId ? syntheticHistory(selectedId) : null),
         [selectedId],
     );
-    const prediction = useParticipantPrediction(features);
+    const prediction = useParticipantPrediction(history);
 
     const [activityType, setActivityType] = useState<ActivityType>("GoalSetting");
     const [postText, setPostText] = useState("");
@@ -84,14 +84,7 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                 ? {
                       dropout_risk: prediction.data.dropout_risk,
                       risk_level: prediction.data.risk_level,
-                      current_inactive_streak: features?.features
-                          .current_inactive_streak as number | undefined,
-                      days_since_last_login: features?.features
-                          .days_since_last_login as number | undefined,
-                      cum_login_count: features?.features
-                          .cum_login_count as number | undefined,
-                      engagement_slope: features?.features
-                          .engagement_slope as number | undefined,
+                      ...demoEngagementContext(history),
                   }
                 : undefined,
         };

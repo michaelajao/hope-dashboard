@@ -5,15 +5,15 @@ import { useMemo } from "react";
 import { KpiTile } from "@/components/kpi-tile";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCohortBatch } from "@/lib/hooks/api";
-import { syntheticBatch } from "@/lib/demo-features";
+import { syntheticBatch } from "@/lib/demo-events";
 import type { CohortMeta } from "@/lib/cohorts";
 
 export function CohortHeader({ cohort }: { cohort: CohortMeta }) {
-    const features = useMemo(
+    const histories = useMemo(
         () => syntheticBatch(cohort.demoParticipants),
         [cohort.demoParticipants],
     );
-    const { data, isLoading } = useCohortBatch(features);
+    const { data, isLoading } = useCohortBatch(histories);
 
     if (isLoading) {
         return (
@@ -25,9 +25,9 @@ export function CohortHeader({ cohort }: { cohort: CohortMeta }) {
         );
     }
     const total = data?.total ?? 0;
-    const high = data?.high_risk_count ?? 0;
-    const med = data?.medium_risk_count ?? 0;
-    const low = data?.low_risk_count ?? 0;
+    const high = data?.high ?? 0;
+    const med = data?.medium ?? 0;
+    const low = data?.low ?? 0;
 
     return (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">

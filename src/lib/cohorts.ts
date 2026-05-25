@@ -1,7 +1,8 @@
 /**
  * Known cohorts for the dashboard. v0 hardcodes the IIH demo cohort
  * (master plan §7); future versions can hydrate from
- * dropout_ml_v2/outputs/artifacts/cohort_meta.parquet via a server action.
+ * engagement_ml's cohort metadata via a server action once the platform
+ * feed is wired.
  */
 
 export type CohortMeta = {
@@ -9,10 +10,10 @@ export type CohortMeta = {
     code: string;
     moduleId: number;
     moduleName: string;
-    /** Synthetic participant ids and weeks for the demo. The dashboard's
-     * dropout-API client expects `ParticipantFeatures` with a feature dict;
-     * v0 generates a small synthetic feature set per participant so the
-     * dashboard can render even without an active platform feed. */
+    /** Synthetic participant ids for the demo. The dropout client now
+     * speaks the event-record contract; `src/lib/demo-events.ts` produces
+     * a deterministic `ParticipantHistory` per id so the dashboard can
+     * render even without an active platform feed. */
     demoParticipants: string[];
 };
 

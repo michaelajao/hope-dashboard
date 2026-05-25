@@ -15,9 +15,9 @@ import type {
     ThumbRequest,
 } from "@/lib/api/commentGen";
 import type {
-    BatchRequest,
+    BatchEventRequest,
     BatchResponse,
-    ParticipantFeatures,
+    ParticipantHistory,
     PredictionResponse,
 } from "@/lib/api/dropout";
 
@@ -46,8 +46,8 @@ async function getJSON<T>(path: string): Promise<T> {
     return res.json() as Promise<T>;
 }
 
-export function useCohortBatch(participants: ParticipantFeatures[]) {
-    const body: BatchRequest = { participants };
+export function useCohortBatch(participants: ParticipantHistory[]) {
+    const body: BatchEventRequest = { participants };
     return useQuery({
         queryKey: ["cohort-batch", participants.map((p) => p.participant_id)],
         queryFn: () => postJSON<BatchResponse>("/api/proxy/dropout/batch", body),
@@ -56,12 +56,13 @@ export function useCohortBatch(participants: ParticipantFeatures[]) {
     });
 }
 
-export function useParticipantPrediction(features: ParticipantFeatures | null) {
+export function useParticipantPrediction(history: ParticipantHistory | null) {
     return useQuery({
-        queryKey: ["predict", features?.participant_id ?? null],
-        queryFn: () => postJSON<PredictionResponse>("/api/proxy/dropout/predict", features!),
+        queryKey: ["predict", history?.participant_id ?? null],
+        queryFn: () =>
+            postJSON<PredictionResponse>("/api/proxy/dropout/predict", history!),
         staleTime: ONE_DAY,
-        enabled: features !== null,
+        enabled: history !== null,
     });
 }
 

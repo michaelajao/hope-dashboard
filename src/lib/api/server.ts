@@ -18,16 +18,29 @@ const COMMENT_GEN_URL =
 const DROPOUT_API_URL =
     process.env.DROPOUT_API_URL ?? "http://localhost:8000";
 
+/**
+ * `HF_TOKEN` is required to invoke private HF Spaces. Empty in pure-local
+ * dev (when the backends run on `localhost:*`); set to a read-scoped token
+ * in production where the backends live behind `*.hf.space`.
+ *
+ * `HOPE_RISK_API_KEY` is engagement_ml's `X-API-Key`. Must match the value
+ * configured as the `API_KEY` secret on the hope-dropout-api Space.
+ */
+const HF_TOKEN = process.env.HF_TOKEN || undefined;
+const HOPE_RISK_API_KEY = process.env.HOPE_RISK_API_KEY || undefined;
+
 export function commentGen() {
     return createCommentGenClient({
         baseUrl: COMMENT_GEN_URL,
         sign: signerOrUndefined(),
+        authToken: HF_TOKEN,
     });
 }
 
 export function dropoutApi() {
     return createDropoutClient({
         baseUrl: DROPOUT_API_URL,
-        sign: signerOrUndefined(),
+        apiKey: HOPE_RISK_API_KEY,
+        authToken: HF_TOKEN,
     });
 }
