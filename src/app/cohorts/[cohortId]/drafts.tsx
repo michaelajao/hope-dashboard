@@ -15,6 +15,7 @@ import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { DraftCard } from "@/components/draft-card";
+import { FollowUpActivity } from "@/components/follow-up-activity";
 import {
     useEvent,
     useGenerate,
@@ -23,6 +24,7 @@ import {
 } from "@/lib/hooks/api";
 import { demoEngagementContext, syntheticHistory } from "@/lib/demo-events";
 import { useUiStore } from "@/lib/store/uiStore";
+import { RECOMMENDED_APPROACH_BULLETS } from "@/lib/risk";
 import type { CohortMeta } from "@/lib/cohorts";
 import type {
     ActivityType,
@@ -186,7 +188,26 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                         pending={event.isPending}
                     />
                 ))}
+
+                {response && (
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                        <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Recommended approach
+                        </h4>
+                        <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-slate-700">
+                            {RECOMMENDED_APPROACH_BULLETS.map((b) => (
+                                <li key={b}>{b}</li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
             </CardContent>
+            <div className="px-6 pb-6">
+                <FollowUpActivity
+                    participantId={selectedId}
+                    cohortId={cohort.id}
+                />
+            </div>
         </Card>
     );
 }

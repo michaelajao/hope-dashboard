@@ -18,7 +18,7 @@ type DraftCardProps = {
 };
 
 const PERSONA_ACCENT: Record<string, string> = {
-    Empathetic: "border-l-4 border-l-sky-500",
+    Empathetic: "border-l-4 border-l-rose-400",
     "Action-oriented": "border-l-4 border-l-amber-500",
     "Goal-oriented": "border-l-4 border-l-emerald-500",
 };

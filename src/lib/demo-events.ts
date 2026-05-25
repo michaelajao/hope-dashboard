@@ -32,7 +32,7 @@ const DEMO_COHORT_FACILITATOR_DENSITY = 0.5;
 
 const ACTIVITY_TYPES = ["GoalSetting", "Emotions", "Gratitude", "MyHOPE"] as const;
 
-function seedHash(s: string): number {
+export function seedHash(s: string): number {
     let h = 2166136261;
     for (let i = 0; i < s.length; i++) {
         h ^= s.charCodeAt(i);
