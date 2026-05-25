@@ -70,8 +70,6 @@ export function syntheticHistory(participantId: string): ParticipantHistory {
     // Engagement intensity governs both the count of events per day and
     // the late-tail tail-off. 0.0 = silent, 1.0 = heavily engaged.
     const intensity = r();
-    // First-event delay (hours) — high intensity participants start fast.
-    const firstEventHourOffset = Math.floor(2 + r() * (intensity < 0.3 ? 96 : 18));
 
     const events: EventRecord[] = [];
     for (let day = 0; day < DEMO_SCORE_AT_DAY; day++) {
@@ -81,7 +79,10 @@ export function syntheticHistory(participantId: string): ParticipantHistory {
         // 0–3 events per day, weighted by density.
         const nEvents = Math.floor(r() * 4 * dailyDensity);
         for (let k = 0; k < nEvents; k++) {
-            const baseHour = day === 0 ? firstEventHourOffset : 9 + Math.floor(r() * 10);
+            // Hours 9-18 (effective_start is 09:00Z, so events always land
+            // inside the [effective_start, effective_start + score_at_day)
+            // window the API requires).
+            const baseHour = 9 + Math.floor(r() * 10);
             const ts = addDays(DEMO_EFFECTIVE_START, day, baseHour);
             const dice = r();
             if (dice < 0.45) {
