@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { Mail, Plus, StickyNote } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -50,16 +50,22 @@ export function FollowUpActivity({
     cohortId,
 }: FollowUpActivityProps) {
     const memory = useMemory(participantId, cohortId);
-    const notes = useNotesStore((s) =>
-        (s.notes[participantId] ?? []).map<ActivityEntry>((n) => ({
-            id: n.id,
-            ts: n.ts,
-            kind: "note",
-            title: "Coach note added",
-            sub: n.text,
-        })),
-    );
+    // Select the raw notes array (stable reference until the store
+    // changes); map outside the selector. Zustand uses useSyncExternalStore
+    // which infinite-loops if the selector returns a fresh array per render.
+    const rawNotes = useNotesStore((s) => s.notes[participantId]);
     const addNote = useNotesStore((s) => s.addNote);
+    const notes = useMemo<ActivityEntry[]>(
+        () =>
+            (rawNotes ?? []).map((n) => ({
+                id: n.id,
+                ts: n.ts,
+                kind: "note",
+                title: "Coach note added",
+                sub: n.text,
+            })),
+        [rawNotes],
+    );
 
     const [draftNote, setDraftNote] = useState("");
 
