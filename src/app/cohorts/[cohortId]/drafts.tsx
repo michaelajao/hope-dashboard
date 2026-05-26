@@ -12,9 +12,7 @@ import {
     CardTitle,
 } from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
-import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Textarea } from "@/components/ui/textarea";
 import { DraftCard, type DraftContext } from "@/components/draft-card";
 import { FollowUpActivity } from "@/components/follow-up-activity";
 import {
@@ -47,13 +45,6 @@ import type {
     GenerateResponse,
     Persona,
 } from "@/lib/api/commentGen";
-
-const ACTIVITY_OPTIONS: ActivityType[] = [
-    "GoalSetting",
-    "Gratitude",
-    "Emotions",
-    "MyHOPE",
-];
 
 /**
  * Short, facilitator-friendly tab labels keyed by SLM persona. Replaces
@@ -145,14 +136,6 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
     // shouldn't tick mid-session.
     const [nowMs] = useState<number>(() => Date.now());
 
-    // Manual overrides — null means "follow the auto-derived value".
-    // This is the React-19-pure pattern: store only what the user
-    // explicitly typed, derive everything else at render time. Avoids
-    // the cascading-render anti-pattern of useEffect → setState.
-    const [manualPostText, setManualPostText] = useState<string | null>(null);
-    const [manualActivityType, setManualActivityType] =
-        useState<ActivityType | null>(null);
-
     const [response, setResponse] = useState<GenerateResponse | null>(null);
     const [error, setError] = useState<string | null>(null);
     // Active persona tab — null means "first draft in response.drafts".
@@ -161,10 +144,11 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
     const [activePersona, setActivePersona] = useState<Persona | null>(null);
 
     // Derive the participant's most recent post within the current
-    // scoring window so the drafts column auto-loads instead of asking
-    // the facilitator to paste. Production: platform fires /generate on
-    // each new participant post. Dashboard mimics that by pulling the
-    // newest `activity` event with a non-empty description.
+    // scoring window. The dashboard is read-only on the participant
+    // side — production fires /generate via webhook when a participant
+    // posts; here we mirror that by picking the newest `activity` event
+    // with a non-empty description. Facilitators never paste; the
+    // platform (or bundle stand-in) is the source.
     const recentPost = useMemo(() => {
         if (!history) return null;
         const acts = history.events
@@ -188,28 +172,19 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
         };
     }, [history, nowMs]);
 
-    // Derived view values — no useEffect, no cascading renders.
-    const postSource: "auto" | "manual" =
-        manualPostText === null ? "auto" : "manual";
-    const postText: string =
-        manualPostText ?? recentPost?.text ?? "";
+    // Drafts column reads its inputs directly from the most recent
+    // platform post — no facilitator pasting. activityType comes from
+    // the post itself; postText is the post's description.
+    const postText: string = recentPost?.text ?? "";
     const activityType: ActivityType =
-        manualActivityType ?? recentPost?.activityType ?? "GoalSetting";
-    const autoPostDaysAgo: number | null =
-        postSource === "auto" ? recentPost?.daysAgo ?? null : null;
+        recentPost?.activityType ?? "GoalSetting";
 
     // Switching participants clears the response, active tab, and any
     // errors. These are legitimate side effects (not derived state) —
     // we're tearing down a previous-participant's generation result
-    // when the user clicks a different participant. The
-    // `set-state-in-effect` rule is too broad here; suppressing the
-    // block. Could be eliminated by lifting `selectedId` into a parent
-    // wrapper and using `<Drafts key={selectedId} />`, but that's a
-    // larger refactor for marginal benefit.
+    // when the user clicks a different participant.
     useEffect(() => {
         /* eslint-disable react-hooks/set-state-in-effect */
-        setManualPostText(null);
-        setManualActivityType(null);
         setResponse(null);
         setActivePersona(null);
         setError(null);
@@ -350,83 +325,55 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                 </div>
             </CardHeader>
             <CardContent className="space-y-4">
-                <div className="space-y-2">
-                    <div className="flex items-baseline justify-between gap-2">
-                        <label className="text-xs font-semibold uppercase tracking-wide text-muted">
-                            Participant post
-                        </label>
-                        {postSource === "auto" && autoPostDaysAgo !== null && (
+                {recentPost ? (
+                    <div className="space-y-2">
+                        <div className="flex items-baseline justify-between gap-2">
+                            <label className="text-xs font-semibold uppercase tracking-wide text-muted">
+                                Participant post
+                            </label>
                             <span className="text-xs text-muted">
                                 from{" "}
-                                {autoPostDaysAgo === 0
+                                {recentPost.daysAgo === 0
                                     ? "today"
-                                    : `${autoPostDaysAgo}d ago`}
-                                {" · "}
-                                <button
-                                    type="button"
-                                    onClick={() => setManualPostText("")}
-                                    className="text-accent-ink hover:underline"
-                                >
-                                    clear
-                                </button>
+                                    : `${recentPost.daysAgo}d ago`}
                             </span>
-                        )}
-                        {postSource === "manual" && recentPost && (
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setManualPostText(null);
-                                    setManualActivityType(null);
-                                }}
-                                className="text-xs text-accent-ink hover:underline"
-                            >
-                                Use most recent post
-                            </button>
-                        )}
+                        </div>
+                        <div className="rounded-md border border-border bg-surface-2 px-3 py-2.5">
+                            <div className="mb-1.5 flex items-center gap-1.5">
+                                <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[10px] font-medium text-accent-ink">
+                                    {recentPost.activityType}
+                                </span>
+                            </div>
+                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">
+                                {recentPost.text}
+                            </p>
+                        </div>
                     </div>
-                    <Textarea
-                        rows={4}
-                        value={postText}
-                        onChange={(e) => setManualPostText(e.target.value)}
-                        placeholder={
-                            recentPost
-                                ? "Auto-loaded from the most recent post. Edit if needed."
-                                : "No recent post in this scoring window — paste one to generate drafts."
-                        }
-                    />
-                </div>
-                <div className="flex items-center gap-2">
-                    <Select
-                        value={activityType}
-                        onChange={(e) =>
-                            setManualActivityType(
-                                e.target.value as ActivityType,
-                            )
-                        }
-                        aria-label="Activity type"
-                        className="w-auto shrink-0"
-                    >
-                        {ACTIVITY_OPTIONS.map((a) => (
-                            <option key={a} value={a}>
-                                {a}
-                            </option>
-                        ))}
-                    </Select>
-                    <Button
-                        onClick={onGenerate}
-                        disabled={!postText.trim() || generate.isPending}
-                        className="flex-1 gap-1.5"
-                    >
-                        {response ? (
-                            <RefreshCcw className="h-3.5 w-3.5" aria-hidden />
-                        ) : null}
-                        {generate.isPending
-                            ? "Generating…"
-                            : response
-                              ? "Regenerate"
-                              : "Generate drafts"}
-                    </Button>
-                </div>
+                ) : (
+                    <div className="rounded-md border border-border bg-surface-2 px-3 py-6 text-center">
+                        <p className="text-sm font-medium text-text-2">
+                            Waiting for {firstName}&apos;s next post
+                        </p>
+                        <p className="mt-1 text-xs text-muted">
+                            No activity in the current scoring window — drafts
+                            will appear here when {firstName} posts next.
+                        </p>
+                    </div>
+                )}
+                <Button
+                    onClick={onGenerate}
+                    disabled={!postText.trim() || generate.isPending}
+                    className="w-full gap-1.5"
+                >
+                    {response ? (
+                        <RefreshCcw className="h-3.5 w-3.5" aria-hidden />
+                    ) : null}
+                    {generate.isPending
+                        ? "Generating…"
+                        : response
+                          ? "Regenerate"
+                          : "Generate drafts"}
+                </Button>
 
                 {response?.safety_signposting && (
                     <div className="rounded-md border border-risk-md bg-risk-md-bg px-3 py-2 text-xs text-risk-md">
