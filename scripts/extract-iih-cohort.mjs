@@ -26,6 +26,10 @@ const RAW_ROOT = "C:/Users/ajaoo/Desktop/engagement_ml/data";
 const TARGET_COHORT_ID = 1680;
 const TARGET_COHORT_NAME = "IIH-COH12-110226";
 const COHORT_EFFECTIVE_START = "2026-02-11T00:00:00Z"; // earliest learner started
+// IIH 2025 is a 6-week programme. Other cohorts will override this when
+// they're added — keep the value explicit so it's never confused with a
+// derived/default value at the dashboard side.
+const COHORT_PROGRAMME_LENGTH_DAYS = 42;
 
 const OUTPUT_DIR = path.join(REPO_ROOT, "local");
 const OUTPUT_PATH = path.join(OUTPUT_DIR, "iih-coh12-110226.json");
@@ -247,6 +251,7 @@ function main() {
             moduleId: picks[0].moduleId,
             moduleName: picks[0].moduleName,
             effectiveStart: COHORT_EFFECTIVE_START,
+            programmeLengthDays: COHORT_PROGRAMME_LENGTH_DAYS,
         },
         participants,
     };

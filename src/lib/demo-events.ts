@@ -22,7 +22,10 @@ import type {
 // across renders. The dashboard's only demo cohort (IIH-COH12-110226)
 // starts here in our scenario; production should hydrate from cohort_meta.
 const DEMO_EFFECTIVE_START = new Date("2025-11-01T09:00:00Z");
-const DEMO_PROGRAMME_LENGTH_DAYS = 42;
+/** Default programme length for the synthetic path when no cohort meta
+ * is supplied. Real cohorts pass `programmeLengthDays` through; this is
+ * only the fallback for fresh-clone / CI rendering. */
+const DEMO_DEFAULT_PROGRAMME_LENGTH_DAYS = 42;
 const DEMO_SCORE_AT_DAY = 42; // score at the final week of the demo
 
 // Cohort-context defaults for the IIH demo. Production replaces these
@@ -67,6 +70,7 @@ function addDays(d: Date, days: number, hourOffset = 9): Date {
 export function syntheticHistory(
     participantId: string,
     scoreAtDay: number = DEMO_SCORE_AT_DAY,
+    programmeLengthDays: number = DEMO_DEFAULT_PROGRAMME_LENGTH_DAYS,
 ): ParticipantHistory {
     const r = rng(seedHash(participantId));
 
@@ -138,7 +142,7 @@ export function syntheticHistory(
         events: filtered,
         cohort_size: DEMO_COHORT_SIZE,
         cohort_facilitator_density: DEMO_COHORT_FACILITATOR_DENSITY,
-        programme_length_days: DEMO_PROGRAMME_LENGTH_DAYS,
+        programme_length_days: programmeLengthDays,
         score_at_day: scoreAtDay,
     };
 }
@@ -146,8 +150,11 @@ export function syntheticHistory(
 export function syntheticBatch(
     ids: string[],
     scoreAtDay?: number,
+    programmeLengthDays?: number,
 ): ParticipantHistory[] {
-    return ids.map((id) => syntheticHistory(id, scoreAtDay));
+    return ids.map((id) =>
+        syntheticHistory(id, scoreAtDay, programmeLengthDays),
+    );
 }
 
 /**

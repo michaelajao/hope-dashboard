@@ -10,6 +10,13 @@ export type CohortMeta = {
     code: string;
     moduleId: number;
     moduleName: string;
+    /** Length of the programme in days. Drives the week-selector range
+     * and the `programme_length_days` field sent to engagement_ml. Not
+     * every cohort runs for 42 days — 4-week pilots and 12-week
+     * programmes coexist. The model only ships trained horizons at
+     * T ∈ {7,14,21,28,35,42} so any score_at_day above 42 anchors to
+     * 42 (see `scoringStore.MODEL_MAX_HORIZON_DAYS`). */
+    programmeLengthDays: number;
     /** Synthetic participant ids for the demo. The dropout client now
      * speaks the event-record contract; `src/lib/demo-events.ts` produces
      * a deterministic `ParticipantHistory` per id so the dashboard can
@@ -23,6 +30,7 @@ export const COHORTS: CohortMeta[] = [
         code: "IIH-COH12-110226",
         moduleId: 337,
         moduleName: "People living with IIH 2025 — V1",
+        programmeLengthDays: 42,
         demoParticipants: [
             "iih-coh12-001",
             "iih-coh12-002",

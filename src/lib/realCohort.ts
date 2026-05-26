@@ -20,9 +20,11 @@ import type { Profile } from "@/lib/profile";
  * are trained for T ∈ {7, 14, 21, 28, 35, 42}; callers pick which one.
  * Default to the final week so existing callers keep behaviour. The
  * dashboard's week-selector overrides this per call.
+ *
+ * `programme_length_days` now comes from the cohort bundle, not a
+ * hardcoded constant — different cohorts run for different lengths.
  */
 const DEFAULT_SCORE_AT_DAY = 42;
-const PROGRAMME_LENGTH_DAYS = 42;
 
 /**
  * Platform exports use local datetime strings without a `Z` suffix.
@@ -97,7 +99,7 @@ export function bundleToHistory(
         // facilitator-event stream; for the bundle we approximate with the
         // share of participants who received any facilitator comment.
         cohort_facilitator_density: facilitatorDensity(bundle),
-        programme_length_days: PROGRAMME_LENGTH_DAYS,
+        programme_length_days: bundle.cohort.programmeLengthDays,
         score_at_day: scoreAtDay,
     };
 }

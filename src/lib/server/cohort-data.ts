@@ -61,6 +61,10 @@ export type CohortBundle = {
         moduleId: number;
         moduleName: string;
         effectiveStart: string;
+        /** Length of the programme in days. Multiple of 7 (one week
+         * granularity). Used to derive the week-selector range and the
+         * `programme_length_days` field sent to engagement_ml. */
+        programmeLengthDays: number;
     };
     participants: RealParticipant[];
 };
