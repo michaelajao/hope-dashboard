@@ -96,7 +96,15 @@ function classifyGenerateError(message: string): GenerateErrorState {
         m.includes("fetch failed") ||
         m.includes("failed to fetch") ||
         m.includes("network") ||
-        m.includes("etimedout")
+        m.includes("etimedout") ||
+        m.includes("500") ||
+        m.includes("502") ||
+        m.includes("503") ||
+        m.includes("504") ||
+        m.includes("internal server error") ||
+        m.includes("bad gateway") ||
+        m.includes("service unavailable") ||
+        m.includes("gateway timeout")
     ) {
         return {
             tone: "offline",
