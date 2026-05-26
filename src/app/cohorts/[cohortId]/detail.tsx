@@ -54,7 +54,7 @@ export function Detail({
         }
         return syntheticHistory(selectedId, scoreAt, programmeLengthDays);
     }, [selectedId, bundle.data, scoreAt, programmeLengthDays]);
-    const prediction = useParticipantPrediction(history);
+    const prediction = useParticipantPrediction(history, cohortId);
 
     // Neighbour navigation: derive prev/next from the cohort bundle's
     // participant order. Falls back to no-op when the bundle hasn't

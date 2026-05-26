@@ -20,6 +20,11 @@ type QueueState = {
     undoDismiss: (participantId: string) => void;
     isHidden: (participantId: string, now: number) => boolean;
     hiddenCount: (participantIds: string[], now: number) => number;
+    /** Wipe all snooze/dismiss state. Called on cohort route change so
+     *  one cohort's session state never leaks into another's (same
+     *  participantId can appear across cohorts when a participant
+     *  re-enrols). */
+    clear: () => void;
 };
 
 const DAY_MS = 86_400_000;
@@ -75,4 +80,6 @@ export const useQueueStore = create<QueueState>((set, get) => ({
         }
         return n;
     },
+
+    clear: () => set({ snoozedUntil: {}, dismissedAt: {} }),
 }));

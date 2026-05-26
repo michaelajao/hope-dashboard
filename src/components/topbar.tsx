@@ -17,7 +17,7 @@ export function Topbar({ cohort }: TopbarProps) {
         () => syntheticBatch(cohort.demoParticipants),
         [cohort.demoParticipants],
     );
-    const { data } = useCohortBatch(histories);
+    const { data } = useCohortBatch(histories, cohort.id);
     const sentThisSession = useSessionStatsStore((s) => s.sentThisSession);
 
     const high = data?.high ?? 0;

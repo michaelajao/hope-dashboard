@@ -47,16 +47,21 @@ async function getJSON<T>(path: string): Promise<T> {
     return res.json() as Promise<T>;
 }
 
-export function useCohortBatch(participants: ParticipantHistory[]) {
+export function useCohortBatch(
+    participants: ParticipantHistory[],
+    cohortId: number | string | null = null,
+) {
     const body: BatchEventRequest = { participants };
-    // score_at_day must be part of the cache key — when the cohort-level
-    // week selector changes, the same set of participants produces a
-    // different ranking and we want React Query to refetch, not serve a
-    // stale week-6 snapshot.
+    // Cache key must include cohortId in addition to score_at_day +
+    // participant ids — participants can re-enrol across cohorts with
+    // the same platform user_id, and TanStack Query caches globally,
+    // so two cohort pages would otherwise collide on a participant
+    // shared between them and serve the wrong cohort's prediction.
     const scoreAtDay = participants[0]?.score_at_day ?? null;
     return useQuery({
         queryKey: [
             "cohort-batch",
+            cohortId,
             scoreAtDay,
             participants.map((p) => p.participant_id),
         ],
@@ -66,10 +71,14 @@ export function useCohortBatch(participants: ParticipantHistory[]) {
     });
 }
 
-export function useParticipantPrediction(history: ParticipantHistory | null) {
+export function useParticipantPrediction(
+    history: ParticipantHistory | null,
+    cohortId: number | string | null = null,
+) {
     return useQuery({
         queryKey: [
             "predict",
+            cohortId,
             history?.participant_id ?? null,
             history?.score_at_day ?? null,
         ],

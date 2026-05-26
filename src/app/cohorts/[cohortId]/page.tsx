@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { findCohort } from "@/lib/cohorts";
+import { CohortSessionReset } from "@/components/cohort-session-reset";
 import { Topbar } from "@/components/topbar";
 import { WeekSelector } from "@/components/week-selector";
 import { Queue } from "./queue";
@@ -18,6 +19,7 @@ export default async function CohortDashboard({
 
     return (
         <main className="flex w-full flex-1 flex-col">
+            <CohortSessionReset cohortId={cohort.id} />
             <Topbar cohort={cohort} />
             <div className="border-b border-border bg-surface-2/40 px-4 py-2 sm:px-5">
                 <WeekSelector programmeLengthDays={cohort.programmeLengthDays} />

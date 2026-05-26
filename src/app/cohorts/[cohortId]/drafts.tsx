@@ -170,7 +170,7 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
             cohort.programmeLengthDays,
         );
     }, [selectedId, bundle.data, scoreAt, cohort.programmeLengthDays]);
-    const prediction = useParticipantPrediction(history);
+    const prediction = useParticipantPrediction(history, cohort.id);
 
     // Capture "now" once at mount. Using Date.now() inside useMemo would
     // be impure (re-evaluating during a re-render could change the value

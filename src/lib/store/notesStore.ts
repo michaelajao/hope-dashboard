@@ -23,6 +23,10 @@ type NotesState = {
     notes: Record<string, FacilitatorNote[]>;
     addNote: (participantId: string, text: string) => void;
     getNotes: (participantId: string) => FacilitatorNote[];
+    /** Wipe all notes. Called on cohort route change so notes against
+     *  one cohort's participants never appear under another's, even
+     *  when the same participantId is shared (re-enrolment). */
+    clear: () => void;
 };
 
 export const useNotesStore = create<NotesState>((set, get) => ({
@@ -42,4 +46,5 @@ export const useNotesStore = create<NotesState>((set, get) => ({
         }));
     },
     getNotes: (participantId) => get().notes[participantId] ?? [],
+    clear: () => set({ notes: {} }),
 }));

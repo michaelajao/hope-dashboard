@@ -71,7 +71,7 @@ export function Queue({ cohort }: { cohort: CohortMeta }) {
         return m;
     }, [histories]);
 
-    const { data, isLoading, error } = useCohortBatch(histories);
+    const { data, isLoading, error } = useCohortBatch(histories, cohort.id);
     const selectedId = useUiStore((s) => s.selectedParticipantId);
     const select = useUiStore((s) => s.selectParticipant);
     const snoozedUntil = useQueueStore((s) => s.snoozedUntil);
