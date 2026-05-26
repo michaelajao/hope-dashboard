@@ -1,5 +1,7 @@
 import { create } from "zustand";
 
+import { DAY_MS } from "@/lib/signals";
+
 /**
  * Session-local snooze + dismiss state for the follow-up queue.
  *
@@ -26,8 +28,6 @@ type QueueState = {
      *  re-enrols). */
     clear: () => void;
 };
-
-const DAY_MS = 86_400_000;
 
 export const useQueueStore = create<QueueState>((set, get) => ({
     snoozedUntil: {},

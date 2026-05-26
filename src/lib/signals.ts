@@ -8,7 +8,10 @@
 
 import type { ParticipantHistory, RiskLevel } from "@/lib/api/dropout";
 
-const DAY_MS = 86_400_000;
+/** Milliseconds in a day. Exported so callers don't redefine the
+ *  constant in five different places (component clocks, store TTLs,
+ *  demo-event back-dating). */
+export const DAY_MS = 86_400_000;
 
 export type EngagementTrend = "Declining" | "Stable" | "Improving";
 export type ActivationLevel = "Low" | "Medium" | "High";

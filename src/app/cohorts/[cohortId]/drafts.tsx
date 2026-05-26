@@ -36,7 +36,7 @@ import {
 } from "@/lib/store/scoringStore";
 import { useUiStore } from "@/lib/store/uiStore";
 import { RECOMMENDED_APPROACH_BULLETS } from "@/lib/risk";
-import { daysSinceLastEvent } from "@/lib/signals";
+import { DAY_MS, daysSinceLastEvent } from "@/lib/signals";
 import type { CohortMeta } from "@/lib/cohorts";
 import type {
     ActivityType,
@@ -210,7 +210,7 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
         const latest = picked ?? acts[0];
         if (!latest) return null;
         const ageMs = nowMs - new Date(latest.timestamp).getTime();
-        const daysAgo = Math.max(0, Math.floor(ageMs / 86_400_000));
+        const daysAgo = Math.max(0, Math.floor(ageMs / DAY_MS));
         const at: ActivityType =
             (latest.activity_type as ActivityType | undefined) ?? "GoalSetting";
         return {

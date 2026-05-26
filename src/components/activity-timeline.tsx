@@ -12,6 +12,7 @@ import {
 
 import { EmptyState } from "@/components/empty-state";
 import type { EventRecord, ParticipantHistory } from "@/lib/api/dropout";
+import { DAY_MS } from "@/lib/signals";
 import { useUiStore } from "@/lib/store/uiStore";
 
 /**
@@ -60,8 +61,7 @@ const ACCENTS: Record<EventRecord["event_type"], string> = {
 function dayLabel(date: Date, now: Date): string {
     const startOf = (d: Date) =>
         new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-    const dayMs = 86_400_000;
-    const diffDays = Math.round((startOf(now) - startOf(date)) / dayMs);
+    const diffDays = Math.round((startOf(now) - startOf(date)) / DAY_MS);
     if (diffDays === 0) return "Today";
     if (diffDays === 1) return "Yesterday";
     if (diffDays < 7) {
@@ -82,8 +82,7 @@ function timeOnly(date: Date): string {
 function relativeTime(date: Date, now: Date): string {
     const startOf = (d: Date) =>
         new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-    const dayMs = 86_400_000;
-    const diffDays = Math.round((startOf(now) - startOf(date)) / dayMs);
+    const diffDays = Math.round((startOf(now) - startOf(date)) / DAY_MS);
     if (diffDays === 0) return "Today";
     if (diffDays === 1) return "Yesterday";
     if (diffDays < 14) return `${diffDays}d ago`;
@@ -283,7 +282,7 @@ export function ActivityTimeline({
                                     type="button"
                                     onClick={() => selectPost(r.event.timestamp)}
                                     className="flex w-full items-start gap-3 px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                                    aria-pressed={isDrafted ? "true" : "false"}
+                                    aria-current={isDrafted ? "true" : undefined}
                                     title="Draft a reply to this post"
                                 >
                                     {content}
