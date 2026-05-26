@@ -136,6 +136,23 @@ function classifyGenerateError(message: string): GenerateErrorState {
     };
 }
 
+/**
+ * Until the real platform wires participant email through, return a
+ * deterministic placeholder for the "Send by email" mailto: link. The
+ * .invalid TLD (RFC 6761) guarantees the address never resolves, so a
+ * stray Send during demo/testing can't accidentally email anyone.
+ *
+ * Production wiring: replace this with `bundle.participants[id].email`
+ * once the export includes it.
+ */
+function placeholderEmail(
+    participantId: string | null,
+    cohortId: number | string,
+): string | null {
+    if (!participantId) return null;
+    return `participant-${participantId}@cohort-${cohortId}.hope-test.invalid`;
+}
+
 export function Drafts({ cohort }: { cohort: CohortMeta }) {
     const selectedId = useUiStore((s) => s.selectedParticipantId);
     const bundle = useCohortBundle();
@@ -336,6 +353,7 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
     const profile = getProfile(selectedId, bundle.data ?? null);
     const displayName = profile.displayName;
     const firstName = displayName.split(/\s+/)[0] ?? displayName;
+    const recipientEmail = placeholderEmail(selectedId, cohort.id);
 
     return (
         <Card className="flex flex-col">
@@ -507,6 +525,7 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                                 pending={event.isPending}
                                 context={ctx}
                                 recipientName={displayName}
+                                recipientEmail={recipientEmail}
                             />
                         </div>
                     );

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
     Flag,
     Info,
+    Mail,
     MoreVertical,
     RefreshCcw,
     Send,
@@ -64,6 +65,10 @@ type DraftCardProps = {
     /** Used in the "To: …" header. Falls back to "the participant" when
      *  the caller doesn't have a name. */
     recipientName?: string;
+    /** Optional email address for the "Send by email" action. When set,
+     *  the kebab exposes a mailto: shortcut that prefills the current
+     *  (edited) draft text. null/undefined hides the action. */
+    recipientEmail?: string | null;
 };
 
 const FLAG_REASONS = [
@@ -92,6 +97,7 @@ export function DraftCard({
     pending,
     context,
     recipientName,
+    recipientEmail,
 }: DraftCardProps) {
     const [text, setText] = useState(draft.body);
     const [edited, setEdited] = useState(false);
@@ -151,6 +157,20 @@ export function DraftCard({
     function clickSend() {
         const action = edited ? "edit" : "accept";
         onSend(String(draft.draft_id), text, action);
+    }
+
+    function clickEmail() {
+        if (!recipientEmail) return;
+        // Open the facilitator's default mail client with the current
+        // (possibly edited) draft text prefilled. We deliberately do NOT
+        // route this through onSend — the email isn't sent yet, the
+        // facilitator still has to hit Send in their mail app.
+        const subject = "Checking in from your Hope facilitator";
+        const url = `mailto:${encodeURIComponent(recipientEmail)}?subject=${encodeURIComponent(
+            subject,
+        )}&body=${encodeURIComponent(text)}`;
+        window.location.href = url;
+        setMenuOpen(false);
     }
 
     const toName = recipientName ?? context?.displayName ?? "the participant";
@@ -242,8 +262,20 @@ export function DraftCard({
                             {menuOpen && (
                                 <div
                                     role="menu"
-                                    className="absolute right-0 z-10 mt-1 w-44 overflow-hidden rounded-md border border-border bg-surface shadow-md"
+                                    className="absolute right-0 z-10 mt-1 w-48 overflow-hidden rounded-md border border-border bg-surface shadow-md"
                                 >
+                                    {recipientEmail && (
+                                        <button
+                                            type="button"
+                                            role="menuitem"
+                                            onClick={clickEmail}
+                                            className="flex w-full items-center gap-2 border-b border-border px-3 py-2 text-left text-xs hover:bg-surface-2"
+                                            title={`Open mailto: ${recipientEmail}`}
+                                        >
+                                            <Mail className="h-3.5 w-3.5" />
+                                            Send by email
+                                        </button>
+                                    )}
                                     <button
                                         type="button"
                                         role="menuitem"
