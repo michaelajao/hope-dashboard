@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+
+const PAGE_SIZE = 10;
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -81,6 +83,16 @@ export function Queue({ cohort }: { cohort: CohortMeta }) {
     const [filter, setFilter] = useState<RiskLevel | "all">("all");
     const [query, setQuery] = useState("");
     const [showHidden, setShowHidden] = useState(false);
+    const [page, setPage] = useState(0);
+
+    // Reset to page 0 whenever filter/query change so the user isn't
+    // stuck on a page that no longer exists for the new result set.
+    // Legitimate side-effect (sync external prop change to local state).
+    useEffect(() => {
+        /* eslint-disable react-hooks/set-state-in-effect */
+        setPage(0);
+        /* eslint-enable react-hooks/set-state-in-effect */
+    }, [filter, query]);
 
     const { visible, hidden } = useMemo(() => {
         const preds = data?.predictions ?? [];
@@ -102,6 +114,17 @@ export function Queue({ cohort }: { cohort: CohortMeta }) {
         }
         return { visible, hidden };
     }, [data?.predictions, filter, query, snoozedUntil, dismissedAt, now]);
+
+    // Paginate the visible list. With 51 cohort participants and a page
+    // size of 10, you get 6 pages; smaller filtered sets land on a
+    // single page. Currently active participant always lands on its
+    // page when selected from elsewhere — clamp here so the nav never
+    // points past the end.
+    const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
+    const safePage = Math.min(page, totalPages - 1);
+    const pageStart = safePage * PAGE_SIZE;
+    const pageEnd = Math.min(pageStart + PAGE_SIZE, visible.length);
+    const pageItems = visible.slice(pageStart, pageEnd);
 
     return (
         <Card className="flex flex-col">
@@ -155,7 +178,7 @@ export function Queue({ cohort }: { cohort: CohortMeta }) {
                         No participants match the current filter.
                     </p>
                 )}
-                {visible.map((p) => {
+                {pageItems.map((p) => {
                     const hist =
                         histLookup.get(p.participant_id) ??
                         syntheticHistory(
@@ -175,6 +198,62 @@ export function Queue({ cohort }: { cohort: CohortMeta }) {
                         />
                     );
                 })}
+                {totalPages > 1 && (
+                    <div className="flex items-center justify-between gap-2 border-t border-border pt-2 text-xs text-muted">
+                        <span>
+                            Showing {pageStart + 1}–{pageEnd} of{" "}
+                            {visible.length}
+                        </span>
+                        <div
+                            className="inline-flex items-center gap-0.5"
+                            role="group"
+                            aria-label="Queue pagination"
+                        >
+                            <button
+                                type="button"
+                                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                                disabled={safePage === 0}
+                                className="rounded px-2 py-1 hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
+                                aria-label="Previous page"
+                            >
+                                ←
+                            </button>
+                            {Array.from({ length: totalPages }, (_, i) => i).map(
+                                (i) => (
+                                    <button
+                                        key={i}
+                                        type="button"
+                                        onClick={() => setPage(i)}
+                                        aria-current={
+                                            i === safePage ? "page" : undefined
+                                        }
+                                        className={
+                                            "min-w-7 rounded px-2 py-1 hover:bg-surface-2 " +
+                                            (i === safePage
+                                                ? "bg-surface-2 font-semibold text-text"
+                                                : "")
+                                        }
+                                    >
+                                        {i + 1}
+                                    </button>
+                                ),
+                            )}
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setPage((p) =>
+                                        Math.min(totalPages - 1, p + 1),
+                                    )
+                                }
+                                disabled={safePage >= totalPages - 1}
+                                className="rounded px-2 py-1 hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
+                                aria-label="Next page"
+                            >
+                                →
+                            </button>
+                        </div>
+                    </div>
+                )}
                 {hidden.length > 0 && (
                     <div className="border-t border-border pt-2">
                         <button
