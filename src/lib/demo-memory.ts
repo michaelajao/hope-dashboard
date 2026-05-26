@@ -16,6 +16,7 @@
  */
 
 import type { ActivityType } from "@/lib/api/commentGen";
+import type { RealParticipant } from "@/lib/server/cohort-data";
 
 const SEEDED = new Set<string>();
 
@@ -75,6 +76,36 @@ export type SeededPost = {
     source: "json_reconcile";
 };
 
+export type SeededReply = {
+    comment_id: number;
+    activity_id: number;
+    participant_id: number;
+    cohort_id: number;
+    facilitator_id: string;
+    text: string;
+    recorded_at: string;
+    source: "json_reconcile";
+};
+
+const ACTIVITY_TYPE_SET: ReadonlySet<ActivityType> = new Set<ActivityType>([
+    "GoalSetting",
+    "Gratitude",
+    "Emotions",
+    "MyHOPE",
+]);
+
+function asActivityType(raw: string | undefined): ActivityType {
+    if (raw && ACTIVITY_TYPE_SET.has(raw as ActivityType)) {
+        return raw as ActivityType;
+    }
+    return "MyHOPE";
+}
+
+function truncate(text: string, max = 500): string {
+    if (text.length <= max) return text;
+    return text.slice(0, max - 1) + "…";
+}
+
 export function buildSeedPosts(
     participantId: string,
     cohortId: number,
@@ -97,38 +128,124 @@ export function buildSeedPosts(
 }
 
 /**
- * Idempotent. Posts each seed entry to /api/proxy/memory/post (which
- * forwards to comment-gen's /memory/post). Marks the participant as
- * seeded so subsequent panel opens don't re-fire. Best-effort: errors
- * are logged but never thrown.
+ * Build memory seeds from the real cohort bundle.
+ *
+ * Two streams: participant posts (the descriptions on their activity
+ * events) and facilitator replies. Both flow through `source:
+ * "json_reconcile"` because that's exactly what's happening — we're
+ * reconciling the platform's JSON export into comment-gen's memory store.
+ */
+export function buildSeedPostsFromBundle(
+    participant: RealParticipant,
+    cohortId: number,
+    moduleId: number,
+): SeededPost[] {
+    const pidNum = Number(
+        participant.participant_id.replace(/[^0-9]/g, "") || "0",
+    );
+    const out: SeededPost[] = [];
+    let i = 0;
+    for (const e of participant.events) {
+        if (e.event_type !== "activity") continue;
+        const text = (e.description ?? "").trim();
+        if (!text) continue;
+        out.push({
+            activity_id: pidNum * 1_000_000 + i,
+            participant_id: pidNum,
+            cohort_id: cohortId,
+            module_id: moduleId,
+            activity_type: asActivityType(e.activity_type),
+            text: truncate(text),
+            recorded_at: e.timestamp,
+            source: "json_reconcile",
+        });
+        i += 1;
+    }
+    return out;
+}
+
+export function buildSeedRepliesFromBundle(
+    participant: RealParticipant,
+    cohortId: number,
+): SeededReply[] {
+    const pidNum = Number(
+        participant.participant_id.replace(/[^0-9]/g, "") || "0",
+    );
+    return participant.priorFacilitatorReplies
+        .filter((r) => r.recordedAt && (r.text ?? "").trim().length > 0)
+        .map((r, i) => ({
+            comment_id: pidNum * 1_000_000 + i,
+            activity_id: r.activityId,
+            participant_id: pidNum,
+            cohort_id: cohortId,
+            facilitator_id: "demo-facilitator",
+            text: truncate(r.text),
+            recorded_at: r.recordedAt as string,
+            source: "json_reconcile",
+        }));
+}
+
+/**
+ * Idempotent. Posts each seed entry to comment-gen's memory store via
+ * the local proxy routes. Marks the participant as seeded so subsequent
+ * panel opens don't re-fire.
+ *
+ * When `realParticipant` is supplied (cohort bundle is loaded), the seeds
+ * come from the real platform export — actual prior activity descriptions
+ * + facilitator replies. Otherwise falls back to the synthetic
+ * `SEED_TEMPLATES` so a fresh clone still has demo memory to retrieve.
+ *
+ * Best-effort: errors are logged but never thrown. comment-gen offline
+ * = silent no-op (the proxy degrades to `{ skipped: true }`).
  */
 export async function seedDemoMemory(
     participantId: string,
     cohortId: number,
     moduleId: number,
+    realParticipant?: RealParticipant | null,
 ): Promise<void> {
     if (SEEDED.has(participantId)) return;
     SEEDED.add(participantId);
-    const posts = buildSeedPosts(participantId, cohortId, moduleId);
-    if (posts.length === 0) return;
-    try {
-        await Promise.all(
-            posts.map((p) =>
-                fetch("/api/proxy/memory/post", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(p),
-                }).catch((err) => {
-                    // Don't let one bad post stop the others.
-                    console.warn(
-                        "[seedDemoMemory] failed to seed",
-                        p.activity_id,
-                        err,
-                    );
-                }),
-            ),
+
+    const posts = realParticipant
+        ? buildSeedPostsFromBundle(realParticipant, cohortId, moduleId)
+        : buildSeedPosts(participantId, cohortId, moduleId);
+    const replies = realParticipant
+        ? buildSeedRepliesFromBundle(realParticipant, cohortId)
+        : [];
+
+    if (posts.length === 0 && replies.length === 0) return;
+
+    const writes: Array<Promise<unknown>> = [];
+    for (const p of posts) {
+        writes.push(
+            fetch("/api/proxy/memory/post", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(p),
+            }).catch((err) => {
+                console.warn(
+                    "[seedDemoMemory] post failed",
+                    p.activity_id,
+                    err,
+                );
+            }),
         );
-    } catch (err) {
-        console.warn("[seedDemoMemory] aborted", err);
     }
+    for (const r of replies) {
+        writes.push(
+            fetch("/api/proxy/memory/reply", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(r),
+            }).catch((err) => {
+                console.warn(
+                    "[seedDemoMemory] reply failed",
+                    r.comment_id,
+                    err,
+                );
+            }),
+        );
+    }
+    await Promise.all(writes);
 }

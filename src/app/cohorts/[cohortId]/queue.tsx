@@ -9,13 +9,18 @@ import { Input } from "@/components/ui/input";
 import { QueueItem } from "@/components/queue-item";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCohortBatch } from "@/lib/hooks/api";
+import { useCohortBundle } from "@/lib/hooks/useCohortBundle";
 import { syntheticBatch, syntheticHistory } from "@/lib/demo-events";
+import { bundleParticipantIds, bundleToHistory } from "@/lib/realCohort";
 import { useUiStore } from "@/lib/store/uiStore";
 import { useQueueStore } from "@/lib/store/queueStore";
 import { QUEUE_PILL_LABELS } from "@/lib/risk";
 import { lastActiveLabel, displayName } from "@/lib/signals";
 import type { CohortMeta } from "@/lib/cohorts";
-import type { RiskLevel } from "@/lib/api/dropout";
+import type {
+    ParticipantHistory,
+    RiskLevel,
+} from "@/lib/api/dropout";
 
 const FILTERS: Array<RiskLevel | "all"> = ["all", "high", "medium", "low"];
 
@@ -25,10 +30,25 @@ function useMountTime(): number {
 }
 
 export function Queue({ cohort }: { cohort: CohortMeta }) {
-    const histories = useMemo(
-        () => syntheticBatch(cohort.demoParticipants),
-        [cohort.demoParticipants],
-    );
+    const bundle = useCohortBundle();
+    const histories: ParticipantHistory[] = useMemo(() => {
+        if (bundle.data) {
+            // Real bundle present — build histories from real events.
+            return bundleParticipantIds(bundle.data)
+                .map((id) => bundleToHistory(bundle.data!, id))
+                .filter((h): h is ParticipantHistory => h !== null);
+        }
+        // Fallback: synthetic stream so the dashboard still renders in CI /
+        // fresh clones where the bundle file is absent.
+        return syntheticBatch(cohort.demoParticipants);
+    }, [bundle.data, cohort.demoParticipants]);
+
+    const histLookup = useMemo(() => {
+        const m = new Map<string, ParticipantHistory>();
+        for (const h of histories) m.set(h.participant_id, h);
+        return m;
+    }, [histories]);
+
     const { data, isLoading, error } = useCohortBatch(histories);
     const selectedId = useUiStore((s) => s.selectedParticipantId);
     const select = useUiStore((s) => s.selectParticipant);
@@ -115,19 +135,22 @@ export function Queue({ cohort }: { cohort: CohortMeta }) {
                         No participants match the current filter.
                     </p>
                 )}
-                {visible.map((p) => (
-                    <QueueItem
-                        key={p.participant_id}
-                        participantId={p.participant_id}
-                        riskLevel={p.risk_level}
-                        riskScore={p.dropout_risk}
-                        lastActiveLabel={lastActiveLabel(
-                            syntheticHistory(p.participant_id),
-                        )}
-                        selected={selectedId === p.participant_id}
-                        onClick={() => select(p.participant_id)}
-                    />
-                ))}
+                {visible.map((p) => {
+                    const hist =
+                        histLookup.get(p.participant_id) ??
+                        syntheticHistory(p.participant_id);
+                    return (
+                        <QueueItem
+                            key={p.participant_id}
+                            participantId={p.participant_id}
+                            riskLevel={p.risk_level}
+                            riskScore={p.dropout_risk}
+                            lastActiveLabel={lastActiveLabel(hist)}
+                            selected={selectedId === p.participant_id}
+                            onClick={() => select(p.participant_id)}
+                        />
+                    );
+                })}
                 {hidden.length > 0 && (
                     <div className="border-t border-border pt-2">
                         <button

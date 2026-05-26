@@ -28,7 +28,9 @@ import {
     weekNumber,
 } from "@/lib/demo-events";
 import { seedDemoMemory } from "@/lib/demo-memory";
-import { getDemoProfile } from "@/lib/profile";
+import { getProfile } from "@/lib/profile";
+import { useCohortBundle } from "@/lib/hooks/useCohortBundle";
+import { bundleToHistory, findRealParticipant } from "@/lib/realCohort";
 import { useUiStore } from "@/lib/store/uiStore";
 import { RECOMMENDED_APPROACH_BULLETS } from "@/lib/risk";
 import { daysSinceLastEvent } from "@/lib/signals";
@@ -50,10 +52,15 @@ const FACILITATOR_ID = "demo-facilitator";
 
 export function Drafts({ cohort }: { cohort: CohortMeta }) {
     const selectedId = useUiStore((s) => s.selectedParticipantId);
-    const history = useMemo(
-        () => (selectedId ? syntheticHistory(selectedId) : null),
-        [selectedId],
-    );
+    const bundle = useCohortBundle();
+    const history = useMemo(() => {
+        if (!selectedId) return null;
+        if (bundle.data) {
+            const real = bundleToHistory(bundle.data, selectedId);
+            if (real) return real;
+        }
+        return syntheticHistory(selectedId);
+    }, [selectedId, bundle.data]);
     const prediction = useParticipantPrediction(history);
 
     const [activityType, setActivityType] = useState<ActivityType>("GoalSetting");
@@ -65,14 +72,22 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
     const thumb = useThumb();
     const event = useEvent();
 
-    // Best-effort: seed two plausible prior posts the first time we open
-    // this participant's panel, so the next /generate has real memory to
-    // retrieve. Idempotent (de-duped inside seedDemoMemory) and silent on
-    // failure (comment-gen offline = no-op).
+    // Best-effort: seed prior posts the first time we open this
+    // participant's panel, so the next /generate has memory to retrieve.
+    // When the real cohort bundle is present, seeds come from the actual
+    // platform export (activity descriptions + facilitator replies); when
+    // it isn't, falls back to the synthetic SEED_TEMPLATES so a fresh
+    // clone still demos memory retrieval.
+    //
+    // Idempotent (de-duped inside seedDemoMemory) and silent on failure
+    // (comment-gen offline = no-op via the proxy's degrade-to-skipped).
     useEffect(() => {
         if (!selectedId) return;
-        seedDemoMemory(selectedId, cohort.id, cohort.moduleId);
-    }, [selectedId, cohort.id, cohort.moduleId]);
+        const real = bundle.data
+            ? findRealParticipant(bundle.data, selectedId)
+            : null;
+        seedDemoMemory(selectedId, cohort.id, cohort.moduleId, real ?? null);
+    }, [selectedId, cohort.id, cohort.moduleId, bundle.data]);
 
     if (!selectedId) {
         return (
@@ -90,7 +105,7 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
     function onGenerate() {
         if (!selectedId) return;
         setError(null);
-        const profile = getDemoProfile(selectedId);
+        const profile = getProfile(selectedId, bundle.data ?? null);
         const body: GenerateRequest = {
             participant_id: Number(
                 String(selectedId).replace(/[^0-9]/g, "") || "0",
@@ -200,7 +215,7 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
 
                 {response?.drafts.map((d) => {
                     const profile = selectedId
-                        ? getDemoProfile(selectedId)
+                        ? getProfile(selectedId, bundle.data ?? null)
                         : null;
                     const ctx: DraftContext | undefined = response
                         ? {

@@ -46,6 +46,10 @@ dev-server.log
 
 .playwright-mcp/
 
+# Local-only cohort data extracted from Hope Move platform JSON exports.
+# Contains real participant bios + posts — keep out of the repo.
+local/
+
 # Ad-hoc Playwright screenshots and scratch
 viewport-*.png
 final-*.png

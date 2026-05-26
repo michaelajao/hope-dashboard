@@ -13,6 +13,8 @@
  */
 
 import { displayName } from "@/lib/signals";
+import type { CohortBundle } from "@/lib/server/cohort-data";
+import { bundleToProfile } from "@/lib/realCohort";
 
 export type Profile = {
     participantId: string;
@@ -63,4 +65,20 @@ export function getDemoProfile(participantId: string): Profile {
         bio: "",
         startedAt: new Date().toISOString(),
     };
+}
+
+/**
+ * Resolve a participant profile, preferring the real cohort bundle when
+ * present. Falls back to the demo stub (or a synthesised default) when
+ * the bundle is missing or doesn't carry that participant.
+ */
+export function getProfile(
+    participantId: string,
+    bundle: CohortBundle | null | undefined,
+): Profile {
+    if (bundle) {
+        const real = bundleToProfile(bundle, participantId);
+        if (real) return real;
+    }
+    return getDemoProfile(participantId);
 }

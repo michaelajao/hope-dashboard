@@ -15,10 +15,13 @@ import { AiSummaryCard } from "@/components/ai-summary-card";
 import { MetricGrid, MetricTile } from "@/components/metric-tile";
 import { DriverBars } from "@/components/driver-bars";
 import { useMemory, useParticipantPrediction } from "@/lib/hooks/api";
+import { useCohortBundle } from "@/lib/hooks/useCohortBundle";
 import { syntheticHistory } from "@/lib/demo-events";
+import { bundleSwemwbs, bundleToHistory } from "@/lib/realCohort";
 import { useUiStore } from "@/lib/store/uiStore";
 import { useQueueStore } from "@/lib/store/queueStore";
 import { friendlyStatus } from "@/lib/risk";
+import type { RealSwemwbs } from "@/lib/server/cohort-data";
 import {
     activationLevel,
     daysSinceLastEvent,
@@ -34,10 +37,19 @@ export function Detail({ cohortId }: { cohortId: number }) {
     const select = useUiStore((s) => s.selectParticipant);
     const snooze = useQueueStore((s) => s.snooze);
     const dismiss = useQueueStore((s) => s.dismiss);
-    const history = useMemo(
-        () => (selectedId ? syntheticHistory(selectedId) : null),
-        [selectedId],
-    );
+    const bundle = useCohortBundle();
+    const history = useMemo(() => {
+        if (!selectedId) return null;
+        if (bundle.data) {
+            const real = bundleToHistory(bundle.data, selectedId);
+            if (real) return real;
+        }
+        return syntheticHistory(selectedId);
+    }, [selectedId, bundle.data]);
+    const swemwbs = useMemo<RealSwemwbs[]>(() => {
+        if (!selectedId || !bundle.data) return [];
+        return bundleSwemwbs(bundle.data, selectedId);
+    }, [selectedId, bundle.data]);
     const prediction = useParticipantPrediction(history);
     const memory = useMemory(selectedId, cohortId);
 
@@ -173,6 +185,8 @@ export function Detail({ cohortId }: { cohortId: number }) {
                     />
                 )}
 
+                {swemwbs.length > 0 && <SwemwbsTrajectory rows={swemwbs} />}
+
                 {prediction.data?.recommended_actions?.length ? (
                     <div>
                         <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">
@@ -232,6 +246,56 @@ export function Detail({ cohortId }: { cohortId: number }) {
                 </div>
             </CardContent>
         </Card>
+    );
+}
+
+function SwemwbsTrajectory({ rows }: { rows: RealSwemwbs[] }) {
+    const latest = rows[rows.length - 1];
+    const delta =
+        rows.length >= 2
+            ? latest.metricScore - rows[0].metricScore
+            : null;
+    const tone =
+        delta === null
+            ? "text-muted"
+            : delta > 0.5
+              ? "text-risk-lo"
+              : delta < -0.5
+                ? "text-risk-hi"
+                : "text-text-2";
+    return (
+        <div>
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">
+                Wellbeing (SWEMWBS)
+            </h4>
+            <div className="mt-2 rounded-md border border-border bg-surface-2 px-3 py-2">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <span className="text-2xl font-semibold text-text">
+                        {latest.metricScore.toFixed(1)}
+                        <span className="ml-1 text-xs font-normal text-muted">
+                            / 35 metric
+                        </span>
+                    </span>
+                    {delta !== null && (
+                        <span className={`text-xs ${tone}`}>
+                            {delta >= 0 ? "+" : ""}
+                            {delta.toFixed(1)} since first session
+                        </span>
+                    )}
+                </div>
+                <ol className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-2">
+                    {rows.map((r, i) => (
+                        <li key={r.recordedAt}>
+                            <span className="text-muted">S{i + 1}</span>{" "}
+                            {r.metricScore.toFixed(1)}{" "}
+                            <span className="text-muted">
+                                · {new Date(r.recordedAt).toLocaleDateString()}
+                            </span>
+                        </li>
+                    ))}
+                </ol>
+            </div>
+        </div>
     );
 }
 
