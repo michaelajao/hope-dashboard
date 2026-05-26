@@ -10,11 +10,11 @@ import { EmptyState } from "@/components/empty-state";
 import { RiskGauge } from "@/components/risk-gauge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar } from "@/components/avatar";
-import { InfoCardRow } from "@/components/info-card-row";
+import { ActivityTimeline } from "@/components/activity-timeline";
 import { AiSummaryCard } from "@/components/ai-summary-card";
 import { MetricGrid, MetricTile } from "@/components/metric-tile";
 import { DriverBars } from "@/components/driver-bars";
-import { useMemory, useParticipantPrediction } from "@/lib/hooks/api";
+import { useParticipantPrediction } from "@/lib/hooks/api";
 import { useCohortBundle } from "@/lib/hooks/useCohortBundle";
 import { syntheticHistory } from "@/lib/demo-events";
 import { bundleToHistory } from "@/lib/realCohort";
@@ -46,7 +46,6 @@ export function Detail({ cohortId }: { cohortId: number }) {
         return syntheticHistory(selectedId);
     }, [selectedId, bundle.data]);
     const prediction = useParticipantPrediction(history);
-    const memory = useMemory(selectedId, cohortId);
 
     function onSnooze() {
         if (!selectedId) return;
@@ -161,10 +160,6 @@ export function Detail({ cohortId }: { cohortId: number }) {
                     ) : null}
                 </div>
 
-                {prediction.data && (
-                    <InfoCardRow prediction={prediction.data} />
-                )}
-
                 {prediction.data && history && (
                     <AiSummaryCard
                         history={history}
@@ -193,50 +188,7 @@ export function Detail({ cohortId }: { cohortId: number }) {
                     </div>
                 ) : null}
 
-                <div>
-                    <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">
-                        Recent activity
-                    </h4>
-                    {memory.isLoading ? (
-                        <div className="mt-2 space-y-2">
-                            <Skeleton className="h-12 w-full" />
-                            <Skeleton className="h-12 w-full" />
-                        </div>
-                    ) : memory.data && memory.data.length > 0 ? (
-                        <ul className="mt-2 space-y-2 text-sm">
-                            {memory.data.slice(0, 5).map((m) => (
-                                <li
-                                    key={m.memory_id}
-                                    className="rounded border border-border bg-surface-2 px-3 py-2"
-                                >
-                                    <div className="flex items-center justify-between text-xs text-muted">
-                                        <span className="capitalize">
-                                            {(m.role ?? "entry").replace(
-                                                "_",
-                                                " ",
-                                            )}
-                                            {m.activity_type
-                                                ? ` · ${m.activity_type}`
-                                                : ""}
-                                        </span>
-                                        {m.ts && (
-                                            <span>
-                                                {new Date(m.ts).toLocaleString()}
-                                            </span>
-                                        )}
-                                    </div>
-                                    <p className="mt-1 line-clamp-3 text-text">
-                                        {m.text}
-                                    </p>
-                                </li>
-                            ))}
-                        </ul>
-                    ) : (
-                        <p className="mt-2 text-sm text-muted">
-                            No prior activity for this participant in this cohort.
-                        </p>
-                    )}
-                </div>
+                {history && <ActivityTimeline history={history} />}
             </CardContent>
         </Card>
     );
