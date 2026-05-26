@@ -33,7 +33,10 @@ const DEMO_SCORE_AT_DAY = 42; // score at the final week of the demo
 const DEMO_COHORT_SIZE = 6;
 const DEMO_COHORT_FACILITATOR_DENSITY = 0.5;
 
-const ACTIVITY_TYPES = ["GoalSetting", "Emotions", "Gratitude", "MyHOPE"] as const;
+// Emotions removed 2026-05-27 — the comment-gen API rejects it
+// (no training pairs), so synthetic histories shouldn't emit posts
+// the AI surface can't draft for. See RETRAIN.md §1.2.
+const ACTIVITY_TYPES = ["GoalSetting", "Gratitude", "MyHOPE"] as const;
 
 export function seedHash(s: string): number {
     let h = 2166136261;

@@ -40,9 +40,11 @@ const SEED_TEMPLATES: Record<string, SeedEntry[]> = {
         },
     ],
     "iih-coh12-002": [
+        // Was an Emotions seed pre-2026-05-27 — swapped to MyHOPE to
+        // match the (now-3-value) ActivityType enum.
         {
-            activityType: "Emotions",
-            text: "Felt low after Monday's appointment but the journal prompt actually helped me name it.",
+            activityType: "MyHOPE",
+            text: "I hope I can name what's happening before it overwhelms me. Monday's appointment was hard but the journal prompt helped.",
             daysAgo: 18,
         },
         {
@@ -90,7 +92,6 @@ export type SeededReply = {
 const ACTIVITY_TYPE_SET: ReadonlySet<ActivityType> = new Set<ActivityType>([
     "GoalSetting",
     "Gratitude",
-    "Emotions",
     "MyHOPE",
 ]);
 

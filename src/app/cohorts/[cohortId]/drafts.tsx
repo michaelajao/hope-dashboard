@@ -113,7 +113,13 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                 (e) =>
                     e.event_type === "activity" &&
                     typeof e.description === "string" &&
-                    e.description.trim().length > 0,
+                    e.description.trim().length > 0 &&
+                    // Emotions removed 2026-05-27 — comment-gen rejects
+                    // it (no training pairs). Skip so the auto-load picks
+                    // the next-newest drafttable activity. The timeline
+                    // still shows Emotions events; they just aren't AI-
+                    // drafted. See RETRAIN.md §1.2.
+                    e.activity_type !== "Emotions",
             )
             .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
         // If the facilitator picked a specific past post from the

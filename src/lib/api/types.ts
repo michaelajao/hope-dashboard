@@ -546,10 +546,10 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
-         * @description Hope Programme activity taxonomy.
+         * @description Hope Programme activity taxonomy. "Emotions" was removed on 2026-05-27 — it had zero training pairs after dataset cleaning, so the LoRA cannot draft for it without hallucinating. /generate returns 422 if "Emotions" is supplied. Dashboards should still surface Emotions posts in the activity timeline but not invoke this API for them.
          * @enum {string}
          */
-        ActivityType: "GoalSetting" | "Gratitude" | "Emotions" | "MyHOPE";
+        ActivityType: "GoalSetting" | "Gratitude" | "MyHOPE";
         /**
          * @description Draft style. Locked by the dashboard contract at
          *     `dropout_ml_v2/deploy/dashboard/app.py:79-107`.

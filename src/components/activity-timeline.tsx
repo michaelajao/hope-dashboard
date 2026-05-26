@@ -182,7 +182,11 @@ export function ActivityTimeline({
                 (e) =>
                     e.event_type === "activity" &&
                     typeof e.description === "string" &&
-                    e.description.trim().length > 0,
+                    e.description.trim().length > 0 &&
+                    // Mirror the drafts.tsx filter: Emotions is not
+                    // AI-drafted, so it shouldn't be the default
+                    // "drafting" highlight.
+                    e.activity_type !== "Emotions",
             )
             .sort((a, b) => b.timestamp.localeCompare(a.timestamp))[0]
             ?.timestamp;
@@ -242,10 +246,19 @@ export function ActivityTimeline({
             {!expanded ? (
                 <ol className="divide-y divide-border rounded-md border border-border bg-surface-2">
                     {compactRows.map((r) => {
+                        // Emotions is intentionally not in ActivityType
+                        // (removed 2026-05-27 — no training pairs). The
+                        // event still appears in the timeline as platform
+                        // history, but the row is non-clickable since
+                        // /generate would 422 for it.
+                        const isEmotions =
+                            r.event.event_type === "activity" &&
+                            r.event.activity_type === "Emotions";
                         const isPost =
                             r.event.event_type === "activity" &&
                             typeof r.event.description === "string" &&
-                            r.event.description.trim().length > 0;
+                            r.event.description.trim().length > 0 &&
+                            !isEmotions;
                         const isDrafted =
                             isPost && r.event.timestamp === draftedTs;
                         const content = (
@@ -259,6 +272,14 @@ export function ActivityTimeline({
                                 {isDrafted && (
                                     <span className="shrink-0 rounded-full bg-accent/20 px-2 py-0.5 text-[10px] font-medium text-accent-ink">
                                         drafting
+                                    </span>
+                                )}
+                                {isEmotions && (
+                                    <span
+                                        className="shrink-0 rounded-full bg-surface-2 px-2 py-0.5 text-[10px] font-medium text-muted"
+                                        title="Emotions posts are not AI-drafted — they call for a human reflection."
+                                    >
+                                        no AI draft
                                     </span>
                                 )}
                             </>
