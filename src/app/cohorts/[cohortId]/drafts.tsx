@@ -174,6 +174,7 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
     // posts; here we mirror that by picking the newest `activity` event
     // with a non-empty description. Facilitators never paste; the
     // platform (or bundle stand-in) is the source.
+    const selectedPostTs = useUiStore((s) => s.selectedPostTs);
     const recentPost = useMemo(() => {
         if (!history) return null;
         const acts = history.events
@@ -184,7 +185,12 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                     e.description.trim().length > 0,
             )
             .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
-        const latest = acts[0];
+        // If the facilitator picked a specific past post from the
+        // timeline, draft against that. Otherwise default to the newest.
+        const picked = selectedPostTs
+            ? acts.find((e) => e.timestamp === selectedPostTs)
+            : undefined;
+        const latest = picked ?? acts[0];
         if (!latest) return null;
         const ageMs = nowMs - new Date(latest.timestamp).getTime();
         const daysAgo = Math.max(0, Math.floor(ageMs / 86_400_000));
@@ -195,7 +201,7 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
             activityType: at,
             daysAgo,
         };
-    }, [history, nowMs]);
+    }, [history, nowMs, selectedPostTs]);
 
     // Drafts column reads its inputs directly from the most recent
     // platform post — no facilitator pasting. activityType comes from

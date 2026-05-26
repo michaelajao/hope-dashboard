@@ -12,6 +12,7 @@ import {
 
 import { EmptyState } from "@/components/empty-state";
 import type { EventRecord, ParticipantHistory } from "@/lib/api/dropout";
+import { useUiStore } from "@/lib/store/uiStore";
 
 /**
  * Chronological activity feed for the detail panel.
@@ -170,6 +171,23 @@ export function ActivityTimeline({
 }) {
     const [expanded, setExpanded] = useState(false);
     const now = useMemo(() => new Date(), []);
+    const selectedPostTs = useUiStore((s) => s.selectedPostTs);
+    const selectPost = useUiStore((s) => s.selectPost);
+    // The post the Drafts panel is currently generating against — newest
+    // when nothing is explicitly picked. Highlighting it makes the
+    // implicit "we're drafting this one" state visible.
+    const draftedTs = useMemo(() => {
+        if (selectedPostTs) return selectedPostTs;
+        return history.events
+            .filter(
+                (e) =>
+                    e.event_type === "activity" &&
+                    typeof e.description === "string" &&
+                    e.description.trim().length > 0,
+            )
+            .sort((a, b) => b.timestamp.localeCompare(a.timestamp))[0]
+            ?.timestamp;
+    }, [selectedPostTs, history.events]);
 
     // Compact-mode rows: most-recent non-page-visit events as narrative
     // one-liners. Identify the most-recent login so its row reads "Last
@@ -224,19 +242,55 @@ export function ActivityTimeline({
 
             {!expanded ? (
                 <ol className="divide-y divide-border rounded-md border border-border bg-surface-2">
-                    {compactRows.map((r) => (
-                        <li
-                            key={r.event.timestamp + r.event.event_type}
-                            className="flex items-start gap-3 px-3 py-2.5 text-sm"
-                        >
-                            <span className="w-16 shrink-0 text-xs text-muted">
-                                {r.when}
-                            </span>
-                            <span className="min-w-0 flex-1 text-text-2">
-                                {r.line}
-                            </span>
-                        </li>
-                    ))}
+                    {compactRows.map((r) => {
+                        const isPost =
+                            r.event.event_type === "activity" &&
+                            typeof r.event.description === "string" &&
+                            r.event.description.trim().length > 0;
+                        const isDrafted =
+                            isPost && r.event.timestamp === draftedTs;
+                        const content = (
+                            <>
+                                <span className="w-16 shrink-0 text-xs text-muted">
+                                    {r.when}
+                                </span>
+                                <span className="min-w-0 flex-1 text-text-2">
+                                    {r.line}
+                                </span>
+                                {isDrafted && (
+                                    <span className="shrink-0 rounded-full bg-accent/20 px-2 py-0.5 text-[10px] font-medium text-accent-ink">
+                                        drafting
+                                    </span>
+                                )}
+                            </>
+                        );
+                        if (!isPost) {
+                            return (
+                                <li
+                                    key={r.event.timestamp + r.event.event_type}
+                                    className="flex items-start gap-3 px-3 py-2.5 text-sm"
+                                >
+                                    {content}
+                                </li>
+                            );
+                        }
+                        return (
+                            <li
+                                key={r.event.timestamp + r.event.event_type}
+                                className={isDrafted ? "bg-accent/10" : ""}
+                            >
+                                <button
+                                    type="button"
+                                    onClick={() => selectPost(r.event.timestamp)}
+                                    className="flex w-full items-start gap-3 px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                                    aria-pressed={isDrafted ? "true" : "false"}
+                                    title="Draft a reply to this post"
+                                >
+                                    {content}
+                                </button>
+                            </li>
+                        );
+                    })}
                 </ol>
             ) : (
                 <ol className="space-y-3">
