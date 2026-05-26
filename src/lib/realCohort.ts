@@ -11,7 +11,6 @@
 import type {
     CohortBundle,
     RealParticipant,
-    RealSwemwbs,
 } from "@/lib/server/cohort-data";
 import type { EventRecord, ParticipantHistory } from "@/lib/api/dropout";
 import type { Profile } from "@/lib/profile";
@@ -131,15 +130,6 @@ export function bundlePriorReplies(
     return [...p.priorFacilitatorReplies]
         .sort((a, b) => (b.recordedAt ?? "").localeCompare(a.recordedAt ?? ""))
         .slice(0, limit);
-}
-
-export function bundleSwemwbs(
-    bundle: CohortBundle,
-    participantId: string,
-): RealSwemwbs[] {
-    const p = findRealParticipant(bundle, participantId);
-    if (!p) return [];
-    return p.swemwbs;
 }
 
 function facilitatorDensity(bundle: CohortBundle): number {

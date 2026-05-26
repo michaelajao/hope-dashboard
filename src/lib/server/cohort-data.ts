@@ -42,17 +42,6 @@ export type RealFacilitatorReply = {
     recordedAt: string | null;
 };
 
-/**
- * SWEMWBS wellbeing score. `metricScore` is the Warwick metric-converted
- * value (7–35 scale); we display this per Gabriel's request. Same-day
- * duplicates are removed at extraction time (first entry wins per session).
- */
-export type RealSwemwbs = {
-    recordedAt: string;
-    rawScore: number | null;
-    metricScore: number;
-};
-
 export type RealParticipant = {
     participant_id: string;
     displayName: string;
@@ -62,7 +51,6 @@ export type RealParticipant = {
     finishedAt: string | null;
     events: RealEvent[];
     priorFacilitatorReplies: RealFacilitatorReply[];
-    swemwbs: RealSwemwbs[];
     activityCount: number;
 };
 

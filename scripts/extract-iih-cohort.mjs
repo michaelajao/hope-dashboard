@@ -68,7 +68,6 @@ function extractUsers(ua) {
         logins: u.logins ?? [],
         pageVisits: u.pageVisits ?? [],
         bookmarks: u.bookmarks ?? [],
-        questionnaireResults: u.questionnaireResults ?? [],
     }));
 }
 
@@ -153,39 +152,6 @@ function eventFromActivity(a) {
     };
 }
 
-/**
- * SWEMWBS dedup per Gabriel (2026-05-26):
- *   "for any instances where there are 2 or more entries within the same
- *    session (e.g. Session 1) please take the first entry and score —
- *    ignore the later. We consider the first answer/Score to be valid."
- *
- * The data has no explicit session number, but the programme administers
- * SWEMWBS at multi-week intervals (Session 1 ≈ baseline, Session 2 ≈ mid,
- * Session 3 ≈ end). Sessions are weeks apart; same-day submissions are the
- * duplicate case the rule targets. We bucket by `started` calendar date
- * and keep the earliest entry per (user, format, date).
- */
-function dedupSwemwbs(results) {
-    const seen = new Set();
-    const out = [];
-    const sorted = [...(results ?? [])].sort((a, b) =>
-        (a.started ?? "").localeCompare(b.started ?? ""),
-    );
-    for (const q of sorted) {
-        if (q.format !== "SWEMWBS") continue;
-        if (q.metricTotalScore == null || q.started == null) continue;
-        const day = q.started.slice(0, 10);
-        const key = `${q.userId}|SWEMWBS|${day}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        out.push({
-            recordedAt: normaliseTimestamp(q.started),
-            rawScore: q.rawTotalScore ?? null,
-            metricScore: q.metricTotalScore,
-        });
-    }
-    return out;
-}
 
 function main() {
     // UserActivity_120526.txt is the May 25 2026 export — it's the first one
@@ -270,7 +236,6 @@ function main() {
             finishedAt: u.finished ? normaliseTimestamp(u.finished) : null,
             events,
             priorFacilitatorReplies: facilitatorByUser.get(u.userId) ?? [],
-            swemwbs: dedupSwemwbs(u.questionnaireResults ?? []),
             activityCount: u.activityCount,
         };
     });
@@ -293,16 +258,13 @@ function main() {
     console.log("summary:");
     for (const p of participants) {
         const hasBio = p.bio.startsWith("Joined the IIH") ? "—" : "bio";
-        const swemwbs = p.swemwbs.length
-            ? `swemwbs=${p.swemwbs.map((s) => s.metricScore.toFixed(1)).join("→")}`
-            : "swemwbs=—";
         const byType = {};
         for (const e of p.events) byType[e.event_type] = (byType[e.event_type] ?? 0) + 1;
         const evDetail = Object.entries(byType)
             .map(([k, v]) => `${k.slice(0, 4)}:${v}`)
             .join(" ");
         console.log(
-            `  ${p.displayName}  uid=${p.participant_id}  events=${p.events.length} (${evDetail})  ${swemwbs}  ${hasBio}`,
+            `  ${p.displayName}  uid=${p.participant_id}  events=${p.events.length} (${evDetail})  ${hasBio}`,
         );
     }
 }
