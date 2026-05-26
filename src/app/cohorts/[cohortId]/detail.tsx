@@ -27,9 +27,9 @@ import { friendlyStatus } from "@/lib/risk";
 import {
     daysSinceLastEvent,
     displayName,
-    distinctActivityTypes,
     eventsLastNDays,
     facilitatorContactCount,
+    replyRateLastNDays,
 } from "@/lib/signals";
 
 export function Detail({
@@ -248,7 +248,7 @@ function DetailMetrics({
 }) {
     const lastActiveDays = daysSinceLastEvent(history);
     const discussion = eventsLastNDays(history, "discussion_post", 14);
-    const types = distinctActivityTypes(history, 14);
+    const reply = replyRateLastNDays(history, 14);
     const facilitatorTouches = facilitatorContactCount(history);
 
     const lastActiveTone =
@@ -263,6 +263,14 @@ function DetailMetrics({
             : discussion.deltaPercent <= -30
               ? "negative"
               : discussion.deltaPercent >= 30
+                ? "positive"
+                : "neutral";
+    const replyTone =
+        reply.ratePercent === null
+            ? "neutral"
+            : reply.ratePercent < 30
+              ? "negative"
+              : reply.ratePercent >= 70
                 ? "positive"
                 : "neutral";
 
@@ -288,9 +296,18 @@ function DetailMetrics({
                 tone={discussionTone}
             />
             <MetricTile
-                label="Activity types"
-                value={`${types} of 4`}
-                delta="last 14d"
+                label="Reply rate"
+                value={
+                    reply.ratePercent === null
+                        ? "n/a"
+                        : `${reply.ratePercent}%`
+                }
+                delta={
+                    reply.ratePercent === null
+                        ? "no posts in 14d"
+                        : `${reply.replies}/${reply.activities} posts replied in 14d`
+                }
+                tone={replyTone}
             />
             <MetricTile
                 label="Facilitator contact"

@@ -68,6 +68,38 @@ export function eventsLastNDays(
     return { count, deltaPercent };
 }
 
+/**
+ * Facilitator reply rate over the last N days, expressed as a percentage.
+ *
+ * Definition: (facilitator_comment events) / (activity events) in the
+ * window, clamped to 0..100. Mirrors the "12% message reply rate"
+ * prototype tile — facilitators see how often their replies are
+ * keeping pace with the participant's posts.
+ *
+ * Returns null when there are no activity events in the window (n/a —
+ * we can't compute a ratio without a denominator).
+ */
+export function replyRateLastNDays(
+    history: ParticipantHistory,
+    nDays: number,
+): { ratePercent: number | null; activities: number; replies: number } {
+    const end = scoreWindowEnd(history);
+    const windowStart = end - nDays * DAY_MS;
+    let activities = 0;
+    let replies = 0;
+    for (const e of history.events) {
+        const ts = new Date(e.timestamp).getTime();
+        if (ts < windowStart || ts >= end) continue;
+        if (e.event_type === "activity") activities += 1;
+        else if (e.event_type === "facilitator_comment") replies += 1;
+    }
+    if (activities === 0) {
+        return { ratePercent: null, activities, replies };
+    }
+    const raw = Math.round((replies / activities) * 100);
+    return { ratePercent: Math.min(100, raw), activities, replies };
+}
+
 export function distinctActivityTypes(
     history: ParticipantHistory,
     nDays: number,
