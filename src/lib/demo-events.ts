@@ -64,7 +64,10 @@ function addDays(d: Date, days: number, hourOffset = 9): Date {
  * spectrum across the six IIH demo ids so the queue panel renders all
  * three tiers without manual fixture choice.
  */
-export function syntheticHistory(participantId: string): ParticipantHistory {
+export function syntheticHistory(
+    participantId: string,
+    scoreAtDay: number = DEMO_SCORE_AT_DAY,
+): ParticipantHistory {
     const r = rng(seedHash(participantId));
 
     // Engagement intensity governs both the count of events per day and
@@ -72,7 +75,7 @@ export function syntheticHistory(participantId: string): ParticipantHistory {
     const intensity = r();
 
     const events: EventRecord[] = [];
-    for (let day = 0; day < DEMO_SCORE_AT_DAY; day++) {
+    for (let day = 0; day < scoreAtDay; day++) {
         // Activity fades after week 4 unless the participant is intense.
         const decay = day < 28 ? 1 : Math.max(0.2, 1 - (day - 28) / 28);
         const dailyDensity = intensity * decay;
@@ -124,7 +127,7 @@ export function syntheticHistory(participantId: string): ParticipantHistory {
     }
 
     // Events must be strictly inside the score window; cap defensively.
-    const windowEndsAt = addDays(DEMO_EFFECTIVE_START, DEMO_SCORE_AT_DAY).getTime();
+    const windowEndsAt = addDays(DEMO_EFFECTIVE_START, scoreAtDay).getTime();
     const filtered = events.filter(
         (e) => new Date(e.timestamp).getTime() < windowEndsAt,
     );
@@ -136,12 +139,15 @@ export function syntheticHistory(participantId: string): ParticipantHistory {
         cohort_size: DEMO_COHORT_SIZE,
         cohort_facilitator_density: DEMO_COHORT_FACILITATOR_DENSITY,
         programme_length_days: DEMO_PROGRAMME_LENGTH_DAYS,
-        score_at_day: DEMO_SCORE_AT_DAY,
+        score_at_day: scoreAtDay,
     };
 }
 
-export function syntheticBatch(ids: string[]): ParticipantHistory[] {
-    return ids.map(syntheticHistory);
+export function syntheticBatch(
+    ids: string[],
+    scoreAtDay?: number,
+): ParticipantHistory[] {
+    return ids.map((id) => syntheticHistory(id, scoreAtDay));
 }
 
 /**

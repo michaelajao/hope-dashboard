@@ -12,6 +12,10 @@ import { useCohortBatch } from "@/lib/hooks/api";
 import { useCohortBundle } from "@/lib/hooks/useCohortBundle";
 import { syntheticBatch, syntheticHistory } from "@/lib/demo-events";
 import { bundleParticipantIds, bundleToHistory } from "@/lib/realCohort";
+import {
+    scoreAtDay as scoreAtDayForWeek,
+    useScoringStore,
+} from "@/lib/store/scoringStore";
 import { useUiStore } from "@/lib/store/uiStore";
 import { useQueueStore } from "@/lib/store/queueStore";
 import { QUEUE_PILL_LABELS } from "@/lib/risk";
@@ -31,17 +35,20 @@ function useMountTime(): number {
 
 export function Queue({ cohort }: { cohort: CohortMeta }) {
     const bundle = useCohortBundle();
+    const scoreAtWeek = useScoringStore((s) => s.scoreAtWeek);
+    const scoreAt = scoreAtDayForWeek(scoreAtWeek);
     const histories: ParticipantHistory[] = useMemo(() => {
         if (bundle.data) {
-            // Real bundle present — build histories from real events.
+            // Real bundle present — build histories from real events up to
+            // the currently-selected programme week.
             return bundleParticipantIds(bundle.data)
-                .map((id) => bundleToHistory(bundle.data!, id))
+                .map((id) => bundleToHistory(bundle.data!, id, scoreAt))
                 .filter((h): h is ParticipantHistory => h !== null);
         }
         // Fallback: synthetic stream so the dashboard still renders in CI /
         // fresh clones where the bundle file is absent.
-        return syntheticBatch(cohort.demoParticipants);
-    }, [bundle.data, cohort.demoParticipants]);
+        return syntheticBatch(cohort.demoParticipants, scoreAt);
+    }, [bundle.data, cohort.demoParticipants, scoreAt]);
 
     const histLookup = useMemo(() => {
         const m = new Map<string, ParticipantHistory>();
@@ -138,7 +145,7 @@ export function Queue({ cohort }: { cohort: CohortMeta }) {
                 {visible.map((p) => {
                     const hist =
                         histLookup.get(p.participant_id) ??
-                        syntheticHistory(p.participant_id);
+                        syntheticHistory(p.participant_id, scoreAt);
                     return (
                         <QueueItem
                             key={p.participant_id}

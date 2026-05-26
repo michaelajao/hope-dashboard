@@ -31,6 +31,10 @@ import { seedDemoMemory } from "@/lib/demo-memory";
 import { getProfile } from "@/lib/profile";
 import { useCohortBundle } from "@/lib/hooks/useCohortBundle";
 import { bundleToHistory, findRealParticipant } from "@/lib/realCohort";
+import {
+    scoreAtDay as scoreAtDayForWeek,
+    useScoringStore,
+} from "@/lib/store/scoringStore";
 import { useUiStore } from "@/lib/store/uiStore";
 import { RECOMMENDED_APPROACH_BULLETS } from "@/lib/risk";
 import { daysSinceLastEvent } from "@/lib/signals";
@@ -66,14 +70,16 @@ const FACILITATOR_ID = "demo-facilitator";
 export function Drafts({ cohort }: { cohort: CohortMeta }) {
     const selectedId = useUiStore((s) => s.selectedParticipantId);
     const bundle = useCohortBundle();
+    const scoreAtWeek = useScoringStore((s) => s.scoreAtWeek);
+    const scoreAt = scoreAtDayForWeek(scoreAtWeek);
     const history = useMemo(() => {
         if (!selectedId) return null;
         if (bundle.data) {
-            const real = bundleToHistory(bundle.data, selectedId);
+            const real = bundleToHistory(bundle.data, selectedId, scoreAt);
             if (real) return real;
         }
-        return syntheticHistory(selectedId);
-    }, [selectedId, bundle.data]);
+        return syntheticHistory(selectedId, scoreAt);
+    }, [selectedId, bundle.data, scoreAt]);
     const prediction = useParticipantPrediction(history);
 
     const [activityType, setActivityType] = useState<ActivityType>("GoalSetting");
@@ -266,7 +272,7 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                                         <button
                                             key={String(d.draft_id)}
                                             role="tab"
-                                            aria-selected={isActive ? "true" : "false"}
+                                            aria-selected={isActive}
                                             type="button"
                                             onClick={() =>
                                                 setActivePersona(d.persona)

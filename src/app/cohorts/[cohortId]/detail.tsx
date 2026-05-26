@@ -17,6 +17,10 @@ import { useParticipantPrediction } from "@/lib/hooks/api";
 import { useCohortBundle } from "@/lib/hooks/useCohortBundle";
 import { syntheticHistory } from "@/lib/demo-events";
 import { bundleParticipantIds, bundleToHistory } from "@/lib/realCohort";
+import {
+    scoreAtDay as scoreAtDayForWeek,
+    useScoringStore,
+} from "@/lib/store/scoringStore";
 import { useUiStore } from "@/lib/store/uiStore";
 import { useQueueStore } from "@/lib/store/queueStore";
 import { friendlyStatus } from "@/lib/risk";
@@ -34,14 +38,16 @@ export function Detail({ cohortId }: { cohortId: number }) {
     const snooze = useQueueStore((s) => s.snooze);
     const dismiss = useQueueStore((s) => s.dismiss);
     const bundle = useCohortBundle();
+    const scoreAtWeek = useScoringStore((s) => s.scoreAtWeek);
+    const scoreAt = scoreAtDayForWeek(scoreAtWeek);
     const history = useMemo(() => {
         if (!selectedId) return null;
         if (bundle.data) {
-            const real = bundleToHistory(bundle.data, selectedId);
+            const real = bundleToHistory(bundle.data, selectedId, scoreAt);
             if (real) return real;
         }
-        return syntheticHistory(selectedId);
-    }, [selectedId, bundle.data]);
+        return syntheticHistory(selectedId, scoreAt);
+    }, [selectedId, bundle.data, scoreAt]);
     const prediction = useParticipantPrediction(history);
 
     // Neighbour navigation: derive prev/next from the cohort bundle's

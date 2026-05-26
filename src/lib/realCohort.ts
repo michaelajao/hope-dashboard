@@ -16,11 +16,12 @@ import type { EventRecord, ParticipantHistory } from "@/lib/api/dropout";
 import type { Profile } from "@/lib/profile";
 
 /**
- * Score-at-day mirrors engagement_ml's per-horizon training: 42 = the final
- * 6-week window. We score the cohort at day 42 across the board so the
- * comparison is apples-to-apples.
+ * Score-at-day mirrors engagement_ml's per-horizon training. Six bundles
+ * are trained for T ∈ {7, 14, 21, 28, 35, 42}; callers pick which one.
+ * Default to the final week so existing callers keep behaviour. The
+ * dashboard's week-selector overrides this per call.
  */
-const SCORE_AT_DAY = 42;
+const DEFAULT_SCORE_AT_DAY = 42;
 const PROGRAMME_LENGTH_DAYS = 42;
 
 /**
@@ -63,13 +64,14 @@ export function findRealParticipant(
 export function bundleToHistory(
     bundle: CohortBundle,
     participantId: string,
+    scoreAtDay: number = DEFAULT_SCORE_AT_DAY,
 ): ParticipantHistory | null {
     const p = findRealParticipant(bundle, participantId);
     if (!p) return null;
 
     const effectiveStart = new Date(bundle.cohort.effectiveStart);
     const windowEndMs =
-        effectiveStart.getTime() + SCORE_AT_DAY * 24 * 60 * 60 * 1000;
+        effectiveStart.getTime() + scoreAtDay * 24 * 60 * 60 * 1000;
 
     const events: EventRecord[] = [];
     for (const e of p.events) {
@@ -96,7 +98,7 @@ export function bundleToHistory(
         // share of participants who received any facilitator comment.
         cohort_facilitator_density: facilitatorDensity(bundle),
         programme_length_days: PROGRAMME_LENGTH_DAYS,
-        score_at_day: SCORE_AT_DAY,
+        score_at_day: scoreAtDay,
     };
 }
 
