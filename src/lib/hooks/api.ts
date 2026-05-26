@@ -49,8 +49,17 @@ async function getJSON<T>(path: string): Promise<T> {
 
 export function useCohortBatch(participants: ParticipantHistory[]) {
     const body: BatchEventRequest = { participants };
+    // score_at_day must be part of the cache key — when the cohort-level
+    // week selector changes, the same set of participants produces a
+    // different ranking and we want React Query to refetch, not serve a
+    // stale week-6 snapshot.
+    const scoreAtDay = participants[0]?.score_at_day ?? null;
     return useQuery({
-        queryKey: ["cohort-batch", participants.map((p) => p.participant_id)],
+        queryKey: [
+            "cohort-batch",
+            scoreAtDay,
+            participants.map((p) => p.participant_id),
+        ],
         queryFn: () => postJSON<BatchResponse>("/api/proxy/dropout/batch", body),
         staleTime: ONE_DAY,
         enabled: participants.length > 0,
@@ -59,7 +68,11 @@ export function useCohortBatch(participants: ParticipantHistory[]) {
 
 export function useParticipantPrediction(history: ParticipantHistory | null) {
     return useQuery({
-        queryKey: ["predict", history?.participant_id ?? null],
+        queryKey: [
+            "predict",
+            history?.participant_id ?? null,
+            history?.score_at_day ?? null,
+        ],
         queryFn: () =>
             postJSON<PredictionResponse>("/api/proxy/dropout/predict", history!),
         staleTime: ONE_DAY,
