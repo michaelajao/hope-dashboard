@@ -32,7 +32,13 @@ import {
     facilitatorContactCount,
 } from "@/lib/signals";
 
-export function Detail({ cohortId }: { cohortId: number }) {
+export function Detail({
+    cohortId,
+    programmeLengthDays,
+}: {
+    cohortId: number;
+    programmeLengthDays: number;
+}) {
     const selectedId = useUiStore((s) => s.selectedParticipantId);
     const select = useUiStore((s) => s.selectParticipant);
     const snooze = useQueueStore((s) => s.snooze);
@@ -46,8 +52,8 @@ export function Detail({ cohortId }: { cohortId: number }) {
             const real = bundleToHistory(bundle.data, selectedId, scoreAt);
             if (real) return real;
         }
-        return syntheticHistory(selectedId, scoreAt);
-    }, [selectedId, bundle.data, scoreAt]);
+        return syntheticHistory(selectedId, scoreAt, programmeLengthDays);
+    }, [selectedId, bundle.data, scoreAt, programmeLengthDays]);
     const prediction = useParticipantPrediction(history);
 
     // Neighbour navigation: derive prev/next from the cohort bundle's
@@ -212,7 +218,22 @@ export function Detail({ cohortId }: { cohortId: number }) {
                     ) : null}
                 </div>
 
-                {history && <DetailMetrics history={history} />}
+                {history && (
+                    <details className="group" open>
+                        <summary className="flex cursor-pointer select-none items-center justify-between text-xs font-semibold uppercase tracking-wide text-muted">
+                            Engagement signals
+                            <span className="text-[10px] text-muted/70 group-open:hidden">
+                                expand
+                            </span>
+                            <span className="hidden text-[10px] text-muted/70 group-open:inline">
+                                collapse
+                            </span>
+                        </summary>
+                        <div className="mt-3">
+                            <DetailMetrics history={history} />
+                        </div>
+                    </details>
+                )}
 
                 {history && <ActivityTimeline history={history} />}
             </CardContent>

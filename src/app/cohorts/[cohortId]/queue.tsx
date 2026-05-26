@@ -40,15 +40,28 @@ export function Queue({ cohort }: { cohort: CohortMeta }) {
     const histories: ParticipantHistory[] = useMemo(() => {
         if (bundle.data) {
             // Real bundle present — build histories from real events up to
-            // the currently-selected programme week.
+            // the currently-selected programme week. programmeLengthDays
+            // comes from the cohort bundle so the API gets cohort-true
+            // metadata instead of a 42-day default.
             return bundleParticipantIds(bundle.data)
                 .map((id) => bundleToHistory(bundle.data!, id, scoreAt))
                 .filter((h): h is ParticipantHistory => h !== null);
         }
         // Fallback: synthetic stream so the dashboard still renders in CI /
-        // fresh clones where the bundle file is absent.
-        return syntheticBatch(cohort.demoParticipants, scoreAt);
-    }, [bundle.data, cohort.demoParticipants, scoreAt]);
+        // fresh clones where the bundle file is absent. Pass the cohort's
+        // declared length so synthetic histories stay consistent with the
+        // queue's week selector.
+        return syntheticBatch(
+            cohort.demoParticipants,
+            scoreAt,
+            cohort.programmeLengthDays,
+        );
+    }, [
+        bundle.data,
+        cohort.demoParticipants,
+        cohort.programmeLengthDays,
+        scoreAt,
+    ]);
 
     const histLookup = useMemo(() => {
         const m = new Map<string, ParticipantHistory>();
@@ -145,7 +158,11 @@ export function Queue({ cohort }: { cohort: CohortMeta }) {
                 {visible.map((p) => {
                     const hist =
                         histLookup.get(p.participant_id) ??
-                        syntheticHistory(p.participant_id, scoreAt);
+                        syntheticHistory(
+                            p.participant_id,
+                            scoreAt,
+                            cohort.programmeLengthDays,
+                        );
                     return (
                         <QueueItem
                             key={p.participant_id}
