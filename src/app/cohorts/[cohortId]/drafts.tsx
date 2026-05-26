@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 
 import { RefreshCcw, Sparkles } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
     Card,
@@ -69,6 +68,58 @@ const PERSONA_TAB_LABEL: Record<Persona, string> = {
 
 const FACILITATOR_ID = "demo-facilitator";
 
+/**
+ * Classify a /generate failure into a facilitator-friendly state.
+ *
+ * The dashboard sees three real failure modes:
+ *  - comment-gen Space unreachable (HF 404, ECONNREFUSED, fetch failed)
+ *  - session expired / not authenticated (401)
+ *  - anything else — surface the raw detail so we can debug
+ *
+ * Returning a structured shape lets the UI render an actionable card
+ * instead of a stack-trace string in front of facilitators.
+ */
+type GenerateErrorState = {
+    tone: "offline" | "auth" | "error";
+    title: string;
+    body: string;
+};
+
+function classifyGenerateError(message: string): GenerateErrorState {
+    const m = message.toLowerCase();
+    if (
+        m.includes("401") ||
+        m.includes("unauthorized") ||
+        m.includes("not authenticated")
+    ) {
+        return {
+            tone: "auth",
+            title: "Sign in again",
+            body: "Your session expired. Refresh the page and sign in to generate drafts.",
+        };
+    }
+    if (
+        m.includes("404") ||
+        m.includes("not found") ||
+        m.includes("econnrefused") ||
+        m.includes("fetch failed") ||
+        m.includes("failed to fetch") ||
+        m.includes("network") ||
+        m.includes("etimedout")
+    ) {
+        return {
+            tone: "offline",
+            title: "Comment generation is offline",
+            body: "The fine-tuned reply model isn't reachable right now. Risk scoring and activity views still work — try again once the Space is back.",
+        };
+    }
+    return {
+        tone: "error",
+        title: "Couldn't generate drafts",
+        body: message,
+    };
+}
+
 export function Drafts({ cohort }: { cohort: CohortMeta }) {
     const selectedId = useUiStore((s) => s.selectedParticipantId);
     const bundle = useCohortBundle();
@@ -80,29 +131,34 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
             const real = bundleToHistory(bundle.data, selectedId, scoreAt);
             if (real) return real;
         }
-        return syntheticHistory(selectedId, scoreAt);
-    }, [selectedId, bundle.data, scoreAt]);
+        return syntheticHistory(
+            selectedId,
+            scoreAt,
+            cohort.programmeLengthDays,
+        );
+    }, [selectedId, bundle.data, scoreAt, cohort.programmeLengthDays]);
     const prediction = useParticipantPrediction(history);
 
-    const [activityType, setActivityType] = useState<ActivityType>("GoalSetting");
-    const [postText, setPostText] = useState("");
+    // Capture "now" once at mount. Using Date.now() inside useMemo would
+    // be impure (re-evaluating during a re-render could change the value
+    // mid-render). Stable per-mount is what we want — recentPost.daysAgo
+    // shouldn't tick mid-session.
+    const [nowMs] = useState<number>(() => Date.now());
+
+    // Manual overrides — null means "follow the auto-derived value".
+    // This is the React-19-pure pattern: store only what the user
+    // explicitly typed, derive everything else at render time. Avoids
+    // the cascading-render anti-pattern of useEffect → setState.
+    const [manualPostText, setManualPostText] = useState<string | null>(null);
+    const [manualActivityType, setManualActivityType] =
+        useState<ActivityType | null>(null);
+
     const [response, setResponse] = useState<GenerateResponse | null>(null);
     const [error, setError] = useState<string | null>(null);
     // Active persona tab — null means "first draft in response.drafts".
     // Reset whenever a new generation lands so the focus snaps to the
     // first persona for the new post.
     const [activePersona, setActivePersona] = useState<Persona | null>(null);
-    // Provenance of the currently-loaded post. "auto" means the dashboard
-    // populated it from the participant's most recent activity in the
-    // bundle (mirrors the production flow where the platform feeds the
-    // post automatically). "manual" means the facilitator edited or
-    // pasted something; we then stop auto-populating until participant /
-    // week changes.
-    const [postSource, setPostSource] = useState<"auto" | "manual">("auto");
-    // Cohort-relative day-of-post for the most recent activity, surfaced
-    // as a small badge ("from 6d ago") so facilitators know they're
-    // looking at the latest post and not a stale paste.
-    const [autoPostDaysAgo, setAutoPostDaysAgo] = useState<number | null>(null);
 
     // Derive the participant's most recent post within the current
     // scoring window so the drafts column auto-loads instead of asking
@@ -121,8 +177,7 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
             .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
         const latest = acts[0];
         if (!latest) return null;
-        const now = Date.now();
-        const ageMs = now - new Date(latest.timestamp).getTime();
+        const ageMs = nowMs - new Date(latest.timestamp).getTime();
         const daysAgo = Math.max(0, Math.floor(ageMs / 86_400_000));
         const at: ActivityType =
             (latest.activity_type as ActivityType | undefined) ?? "GoalSetting";
@@ -131,29 +186,34 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
             activityType: at,
             daysAgo,
         };
-    }, [history]);
+    }, [history, nowMs]);
 
-    // Auto-fill on participant/week change (only when the field is in
-    // "auto" mode — we don't want to clobber a half-edited draft).
-    useEffect(() => {
-        if (postSource !== "auto") return;
-        if (!recentPost) {
-            setPostText("");
-            setAutoPostDaysAgo(null);
-            return;
-        }
-        setPostText(recentPost.text);
-        setActivityType(recentPost.activityType);
-        setAutoPostDaysAgo(recentPost.daysAgo);
-    }, [recentPost, postSource]);
+    // Derived view values — no useEffect, no cascading renders.
+    const postSource: "auto" | "manual" =
+        manualPostText === null ? "auto" : "manual";
+    const postText: string =
+        manualPostText ?? recentPost?.text ?? "";
+    const activityType: ActivityType =
+        manualActivityType ?? recentPost?.activityType ?? "GoalSetting";
+    const autoPostDaysAgo: number | null =
+        postSource === "auto" ? recentPost?.daysAgo ?? null : null;
 
-    // Switching participants resets the source back to auto so the next
-    // participant's most-recent-post lands automatically.
+    // Switching participants clears the response, active tab, and any
+    // errors. These are legitimate side effects (not derived state) —
+    // we're tearing down a previous-participant's generation result
+    // when the user clicks a different participant. The
+    // `set-state-in-effect` rule is too broad here; suppressing the
+    // block. Could be eliminated by lifting `selectedId` into a parent
+    // wrapper and using `<Drafts key={selectedId} />`, but that's a
+    // larger refactor for marginal benefit.
     useEffect(() => {
-        setPostSource("auto");
+        /* eslint-disable react-hooks/set-state-in-effect */
+        setManualPostText(null);
+        setManualActivityType(null);
         setResponse(null);
         setActivePersona(null);
         setError(null);
+        /* eslint-enable react-hooks/set-state-in-effect */
     }, [selectedId]);
 
     const generate = useGenerate();
@@ -278,10 +338,7 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                                 {" · "}
                                 <button
                                     type="button"
-                                    onClick={() => {
-                                        setPostSource("manual");
-                                        setPostText("");
-                                    }}
+                                    onClick={() => setManualPostText("")}
                                     className="text-accent-ink hover:underline"
                                 >
                                     clear
@@ -291,7 +348,10 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                         {postSource === "manual" && recentPost && (
                             <button
                                 type="button"
-                                onClick={() => setPostSource("auto")}
+                                onClick={() => {
+                                    setManualPostText(null);
+                                    setManualActivityType(null);
+                                }}
                                 className="text-xs text-accent-ink hover:underline"
                             >
                                 Use most recent post
@@ -301,10 +361,7 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                     <Textarea
                         rows={4}
                         value={postText}
-                        onChange={(e) => {
-                            setPostText(e.target.value);
-                            setPostSource("manual");
-                        }}
+                        onChange={(e) => setManualPostText(e.target.value)}
                         placeholder={
                             recentPost
                                 ? "Auto-loaded from the most recent post. Edit if needed."
@@ -316,10 +373,12 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                     <Select
                         value={activityType}
                         onChange={(e) =>
-                            setActivityType(e.target.value as ActivityType)
+                            setManualActivityType(
+                                e.target.value as ActivityType,
+                            )
                         }
                         aria-label="Activity type"
-                        className="w-auto flex-shrink-0"
+                        className="w-auto shrink-0"
                     >
                         {ACTIVITY_OPTIONS.map((a) => (
                             <option key={a} value={a}>
@@ -348,9 +407,24 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                         {response.safety_signposting}
                     </div>
                 )}
-                {error && (
-                    <p className="text-xs text-risk-hi">{error}</p>
-                )}
+                {error && (() => {
+                    const state = classifyGenerateError(error);
+                    const tone =
+                        state.tone === "offline"
+                            ? "border-muted bg-surface-2 text-text-2"
+                            : state.tone === "auth"
+                              ? "border-risk-md bg-risk-md-bg text-risk-md"
+                              : "border-risk-hi bg-risk-hi-bg text-risk-hi";
+                    return (
+                        <div
+                            role="status"
+                            className={`rounded-md border px-3 py-2 text-xs ${tone}`}
+                        >
+                            <div className="font-medium">{state.title}</div>
+                            <p className="mt-1 leading-relaxed">{state.body}</p>
+                        </div>
+                    );
+                })()}
 
                 {generate.isPending && (
                     <div className="space-y-3">
@@ -430,16 +504,22 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                     );
                 })()}
                 {response && (
-                    <div className="rounded-lg border border-border bg-surface-2 px-3 py-2">
-                        <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">
+                    <details className="group rounded-lg border border-border bg-surface-2 px-3 py-2">
+                        <summary className="flex cursor-pointer select-none items-center justify-between text-xs font-semibold uppercase tracking-wide text-muted">
                             Recommended approach
-                        </h4>
+                            <span className="text-[10px] text-muted/70 group-open:hidden">
+                                show
+                            </span>
+                            <span className="hidden text-[10px] text-muted/70 group-open:inline">
+                                hide
+                            </span>
+                        </summary>
                         <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-text-2">
                             {RECOMMENDED_APPROACH_BULLETS.map((b) => (
                                 <li key={b}>{b}</li>
                             ))}
                         </ul>
-                    </div>
+                    </details>
                 )}
             </CardContent>
             <div className="px-6 pb-6">

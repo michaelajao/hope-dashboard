@@ -100,17 +100,11 @@ export function DraftCard({
     const [flagNotes, setFlagNotes] = useState("");
     const [rejected, setRejected] = useState(false);
 
-    // Reset local state when the parent feeds a new draft (e.g. tab swap
-    // or regeneration). Without this, switching tabs would keep the old
-    // edited text.
-    useEffect(() => {
-        setText(draft.body);
-        setEdited(false);
-        setThumb(null);
-        setMenuOpen(false);
-        setFlagging(false);
-        setRejected(false);
-    }, [draft.draft_id, draft.body]);
+    // No `reset state on draft change` effect: the parent already
+    // remounts this component via `key={String(current.draft_id)}` when
+    // the active persona changes or a new generation lands. useState
+    // initialisers fire fresh on each mount, so state naturally resets
+    // — no cascading-render anti-pattern required.
 
     // Close the kebab menu when clicking outside.
     const menuRef = useRef<HTMLDivElement>(null);
