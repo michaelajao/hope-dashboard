@@ -36,6 +36,11 @@ export function createCommentGenClient(
     const { request } = createClient({
         baseUrl: opts.baseUrl ?? DEFAULT_BASE_URL,
         sign: opts.sign,
+        // Forward the HF token so the comment-gen client can hit a
+        // PRIVATE HF Space. Without this, the gateway returns 404
+        // and the dashboard surfaces the 'comment generation is
+        // offline' status card even though the Space is up.
+        authToken: opts.authToken,
         cookie: opts.cookie,
         fetchImpl: opts.fetchImpl,
     });
