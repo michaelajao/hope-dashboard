@@ -11,7 +11,6 @@ import { RiskGauge } from "@/components/risk-gauge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar } from "@/components/avatar";
 import { ActivityTimeline } from "@/components/activity-timeline";
-import { AiSummaryCard } from "@/components/ai-summary-card";
 import { MetricGrid, MetricTile } from "@/components/metric-tile";
 import { DriverBars } from "@/components/driver-bars";
 import { useParticipantPrediction } from "@/lib/hooks/api";
@@ -22,11 +21,9 @@ import { useUiStore } from "@/lib/store/uiStore";
 import { useQueueStore } from "@/lib/store/queueStore";
 import { friendlyStatus } from "@/lib/risk";
 import {
-    activationLevel,
     daysSinceLastEvent,
     displayName,
     distinctActivityTypes,
-    engagementTrend,
     eventsLastNDays,
     facilitatorContactCount,
 } from "@/lib/signals";
@@ -160,33 +157,7 @@ export function Detail({ cohortId }: { cohortId: number }) {
                     ) : null}
                 </div>
 
-                {prediction.data && history && (
-                    <AiSummaryCard
-                        history={history}
-                        prediction={prediction.data}
-                    />
-                )}
-
-                {history && prediction.data && (
-                    <DetailMetrics
-                        history={history}
-                        factors={prediction.data.contributing_factors}
-                        riskLevel={prediction.data.risk_level}
-                    />
-                )}
-
-                {prediction.data?.recommended_actions?.length ? (
-                    <div>
-                        <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">
-                            Recommended actions
-                        </h4>
-                        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-text-2">
-                            {prediction.data.recommended_actions.map((a, i) => (
-                                <li key={i}>{a}</li>
-                            ))}
-                        </ul>
-                    </div>
-                ) : null}
+                {history && <DetailMetrics history={history} />}
 
                 {history && <ActivityTimeline history={history} />}
             </CardContent>
@@ -196,19 +167,13 @@ export function Detail({ cohortId }: { cohortId: number }) {
 
 function DetailMetrics({
     history,
-    factors,
-    riskLevel,
 }: {
     history: ReturnType<typeof syntheticHistory>;
-    factors: string[];
-    riskLevel: "low" | "medium" | "high";
 }) {
     const lastActiveDays = daysSinceLastEvent(history);
     const discussion = eventsLastNDays(history, "discussion_post", 14);
     const types = distinctActivityTypes(history, 14);
     const facilitatorTouches = facilitatorContactCount(history);
-    const trend = engagementTrend(history);
-    const activation = activationLevel(factors, riskLevel);
 
     const lastActiveTone =
         lastActiveDays === 0
@@ -224,12 +189,6 @@ function DetailMetrics({
               : discussion.deltaPercent >= 30
                 ? "positive"
                 : "neutral";
-    const trendTone =
-        trend === "Declining"
-            ? "negative"
-            : trend === "Improving"
-              ? "positive"
-              : "neutral";
 
     return (
         <MetricGrid>
@@ -263,13 +222,6 @@ function DetailMetrics({
                 delta={facilitatorTouches === 0 ? "no comments yet" : "to date"}
                 tone={facilitatorTouches === 0 ? "negative" : "neutral"}
             />
-            <MetricTile
-                label="Engagement trend"
-                value={trend}
-                delta="vs prior 14d"
-                tone={trendTone}
-            />
-            <MetricTile label="Activation level" value={activation} />
         </MetricGrid>
     );
 }
