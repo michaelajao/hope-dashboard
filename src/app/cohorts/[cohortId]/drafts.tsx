@@ -37,8 +37,10 @@ import { daysSinceLastEvent } from "@/lib/signals";
 import type { CohortMeta } from "@/lib/cohorts";
 import type {
     ActivityType,
+    Draft,
     GenerateRequest,
     GenerateResponse,
+    Persona,
 } from "@/lib/api/commentGen";
 
 const ACTIVITY_OPTIONS: ActivityType[] = [
@@ -47,6 +49,17 @@ const ACTIVITY_OPTIONS: ActivityType[] = [
     "Emotions",
     "MyHOPE",
 ];
+
+/**
+ * Short, facilitator-friendly tab labels keyed by SLM persona. Replaces
+ * the longer PersonaLabel ("Warm personal check-in") so the tabs stay
+ * compact on the drafts column.
+ */
+const PERSONA_TAB_LABEL: Record<Persona, string> = {
+    Empathetic: "Warm check-in",
+    "Action-oriented": "Next-step nudge",
+    "Goal-oriented": "Goal-focused",
+};
 
 const FACILITATOR_ID = "demo-facilitator";
 
@@ -67,6 +80,10 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
     const [postText, setPostText] = useState("");
     const [response, setResponse] = useState<GenerateResponse | null>(null);
     const [error, setError] = useState<string | null>(null);
+    // Active persona tab — null means "first draft in response.drafts".
+    // Reset whenever a new generation lands so the focus snaps to the
+    // first persona for the new post.
+    const [activePersona, setActivePersona] = useState<Persona | null>(null);
 
     const generate = useGenerate();
     const thumb = useThumb();
@@ -125,7 +142,11 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                 : undefined,
         };
         generate.mutate(body, {
-            onSuccess: (res) => setResponse(res),
+            onSuccess: (res) => {
+                setResponse(res);
+                // Reset focus to the first draft on each new generation.
+                setActivePersona(res.drafts[0]?.persona ?? null);
+            },
             onError: (err) => setError((err as Error).message),
         });
     }
@@ -213,33 +234,67 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                     </div>
                 )}
 
-                {response?.drafts.map((d) => {
+                {response && (() => {
+                    const drafts = response.drafts;
+                    if (drafts.length === 0) return null;
+                    const current: Draft =
+                        drafts.find((d) => d.persona === activePersona) ??
+                        drafts[0];
                     const profile = selectedId
                         ? getProfile(selectedId, bundle.data ?? null)
                         : null;
-                    const ctx: DraftContext | undefined = response
-                        ? {
-                              topFactors: prediction.data?.contributing_factors ?? [],
-                              lastActiveDays: history
-                                  ? daysSinceLastEvent(history)
-                                  : null,
-                              memoryUsed: Boolean(response.memory_used),
-                              engagementUsed: Boolean(response.engagement_used),
-                              displayName: profile?.displayName,
-                              bio: profile?.bio || undefined,
-                          }
-                        : undefined;
+                    const ctx: DraftContext = {
+                        topFactors: prediction.data?.contributing_factors ?? [],
+                        lastActiveDays: history
+                            ? daysSinceLastEvent(history)
+                            : null,
+                        memoryUsed: Boolean(response.memory_used),
+                        engagementUsed: Boolean(response.engagement_used),
+                        displayName: profile?.displayName,
+                        bio: profile?.bio || undefined,
+                    };
                     return (
-                        <DraftCard
-                            key={String(d.draft_id)}
-                            draft={d}
-                            onThumb={onThumb}
-                            onSend={onSend}
-                            pending={event.isPending}
-                            context={ctx}
-                        />
+                        <div className="space-y-3">
+                            <div
+                                role="tablist"
+                                aria-label="Draft tone"
+                                className="flex flex-wrap gap-1 rounded-md bg-surface-2 p-1"
+                            >
+                                {drafts.map((d) => {
+                                    const isActive = d.persona === current.persona;
+                                    return (
+                                        <button
+                                            key={String(d.draft_id)}
+                                            role="tab"
+                                            aria-selected={isActive ? "true" : "false"}
+                                            type="button"
+                                            onClick={() =>
+                                                setActivePersona(d.persona)
+                                            }
+                                            className={
+                                                "flex-1 rounded px-3 py-1.5 text-xs font-medium transition-colors " +
+                                                (isActive
+                                                    ? "bg-surface text-text shadow-sm"
+                                                    : "text-muted hover:text-text-2")
+                                            }
+                                        >
+                                            {PERSONA_TAB_LABEL[d.persona] ??
+                                                d.persona}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            <DraftCard
+                                key={String(current.draft_id)}
+                                draft={current}
+                                onThumb={onThumb}
+                                onSend={onSend}
+                                pending={event.isPending}
+                                context={ctx}
+                            />
+                        </div>
                     );
-                })}
+                })()}
                 {response && (
                     <div className="rounded-lg border border-border bg-surface-2 px-3 py-2">
                         <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">
