@@ -59,99 +59,13 @@ const PERSONA_TAB_LABEL: Record<Persona, string> = {
 
 const FACILITATOR_ID = "demo-facilitator";
 
-/**
- * Classify a /generate failure into a facilitator-friendly state.
- *
- * The dashboard sees three real failure modes:
- *  - comment-gen Space unreachable (HF 404, ECONNREFUSED, fetch failed)
- *  - session expired / not authenticated (401)
- *  - anything else — surface the raw detail so we can debug
- *
- * Returning a structured shape lets the UI render an actionable card
- * instead of a stack-trace string in front of facilitators.
- */
-type GenerateErrorState = {
-    tone: "offline" | "auth" | "error";
-    title: string;
-    body: string;
-};
-
-const MODEL_VERSION_FALLBACKS: Record<string, string> = {
-    "stub-disabled": "stub (kill-switch)",
-    "safety-block": "safety block",
-    "error-fallback": "fallback",
-    "legacy-stub": "legacy stub",
-};
-
-function formatModelLabel(modelVersion: string): string {
-    if (MODEL_VERSION_FALLBACKS[modelVersion]) {
-        return MODEL_VERSION_FALLBACKS[modelVersion];
-    }
-    const afterSlash = modelVersion.includes("/")
-        ? modelVersion.split("/").pop()!
-        : modelVersion;
-    return afterSlash.replace(/-lora$/, "");
-}
-
-function classifyGenerateError(message: string): GenerateErrorState {
-    const m = message.toLowerCase();
-    if (
-        m.includes("401") ||
-        m.includes("unauthorized") ||
-        m.includes("not authenticated")
-    ) {
-        return {
-            tone: "auth",
-            title: "Sign in again",
-            body: "Your session expired. Refresh the page and sign in to generate drafts.",
-        };
-    }
-    if (
-        m.includes("404") ||
-        m.includes("not found") ||
-        m.includes("econnrefused") ||
-        m.includes("fetch failed") ||
-        m.includes("failed to fetch") ||
-        m.includes("network") ||
-        m.includes("etimedout") ||
-        m.includes("500") ||
-        m.includes("502") ||
-        m.includes("503") ||
-        m.includes("504") ||
-        m.includes("internal server error") ||
-        m.includes("bad gateway") ||
-        m.includes("service unavailable") ||
-        m.includes("gateway timeout")
-    ) {
-        return {
-            tone: "offline",
-            title: "Comment generation is offline",
-            body: "The fine-tuned reply model isn't reachable right now. Risk scoring and activity views still work — try again once the Space is back.",
-        };
-    }
-    return {
-        tone: "error",
-        title: "Couldn't generate drafts",
-        body: message,
-    };
-}
-
-/**
- * Until the real platform wires participant email through, return a
- * deterministic placeholder for the "Send by email" mailto: link. The
- * .invalid TLD (RFC 6761) guarantees the address never resolves, so a
- * stray Send during demo/testing can't accidentally email anyone.
- *
- * Production wiring: replace this with `bundle.participants[id].email`
- * once the export includes it.
- */
-function placeholderEmail(
-    participantId: string | null,
-    cohortId: number | string,
-): string | null {
-    if (!participantId) return null;
-    return `participant-${participantId}@cohort-${cohortId}.hope-test.invalid`;
-}
+// Pure helpers extracted to ./drafts-helpers.ts so Vitest can import
+// them in a Node environment without dragging in the React/Next tree.
+import {
+    classifyGenerateError,
+    emailForDisengaged,
+    formatModelLabel,
+} from "./drafts-helpers";
 
 export function Drafts({ cohort }: { cohort: CohortMeta }) {
     const selectedId = useUiStore((s) => s.selectedParticipantId);
@@ -353,7 +267,11 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
     const profile = getProfile(selectedId, bundle.data ?? null);
     const displayName = profile.displayName;
     const firstName = displayName.split(/\s+/)[0] ?? displayName;
-    const recipientEmail = placeholderEmail(selectedId, cohort.id);
+    const recipientEmail = emailForDisengaged(
+        selectedId,
+        cohort.id,
+        prediction.data?.risk_level,
+    );
 
     return (
         <Card className="flex flex-col">
@@ -488,13 +406,11 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                                     {drafts.map((d) => {
                                         const isActive =
                                             d.persona === current.persona;
-                                        const ariaSelected: "true" | "false" =
-                                            isActive ? "true" : "false";
                                         return (
                                             <button
                                                 key={String(d.draft_id)}
                                                 role="tab"
-                                                aria-selected={ariaSelected}
+                                                aria-selected={isActive}
                                                 type="button"
                                                 onClick={() =>
                                                     setActivePersona(d.persona)
