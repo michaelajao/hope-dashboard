@@ -48,7 +48,6 @@ export type DraftContext = {
     memoryUsed: boolean;
     engagementUsed: boolean;
     displayName?: string;
-    bio?: string;
     memorySnippets?: string[];
 };
 
@@ -76,7 +75,10 @@ const FLAG_REASONS = [
 ] as const;
 
 function isPersonalised(ctx: DraftContext): boolean {
-    return ctx.memoryUsed && Boolean(ctx.bio);
+    // Memory retrieval is the personalisation signal we trust — it
+    // means the SLM had prior posts in its prompt. Profile bios used to
+    // count here too but they're not available for cohort 1680.
+    return ctx.memoryUsed;
 }
 
 export function DraftCard({
@@ -369,14 +371,6 @@ export function DraftCard({
                             </span>{" "}
                             {draft.persona} — {draft.label}
                         </div>
-                        {context.bio && (
-                            <div>
-                                <span className="font-medium text-text-2">
-                                    Profile:
-                                </span>{" "}
-                                {context.bio}
-                            </div>
-                        )}
                         {context.topFactors.length > 0 && (
                             <div>
                                 <span className="font-medium text-text-2">

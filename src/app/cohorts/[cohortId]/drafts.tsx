@@ -421,7 +421,6 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                         memoryUsed: Boolean(response.memory_used),
                         engagementUsed: Boolean(response.engagement_used),
                         displayName: profile.displayName,
-                        bio: profile.bio || undefined,
                     };
                     return (
                         <div className="space-y-3">
