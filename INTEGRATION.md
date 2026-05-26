@@ -45,6 +45,40 @@ The signature is over the **raw request body bytes** — no whitespace mutation,
 
 Per participant, **weekly** (or whenever the platform's scoring cadence triggers). Not per-event. The model's feature builder aggregates 6 weeks of event history into a single score; calling it more often than weekly wastes compute and produces noisy week-over-week values.
 
+### Production cadence — recommended pattern
+
+The model is trained at fixed horizons `T ∈ {7, 14, 21, 28, 35, 42}`. Production should follow a **weekly batch + on-demand refresh** pattern:
+
+```text
+Mon 06:00 cron (per cohort)
+  ↓
+POST /batch (engagement_ml) for every active participant
+  ↓
+Store result in a `weekly_predictions` table:
+  (participant_id, week_starting, score_at_day, dropout_risk,
+   risk_level, contributing_factors, contributing_factor_weights,
+   recommended_actions, model_version, computed_at)
+
+Dashboard reads from the table:
+  - latest row per participant → current view (queue rank, detail panel)
+  - earlier rows → trajectory sparkline / week-over-week tile
+
+Optional "Refresh now" button on the detail panel:
+  POST /predict (engagement_ml) with events through current moment.
+  Result shown in-UI, flagged "as-of HH:MM", NOT written to the
+  weekly_predictions table. Covers the "is this person getting worse
+  this week?" case without disrupting the consistent weekly story.
+```
+
+Why batch + store, not compute-on-demand:
+
+- **Consistency**: every facilitator looking at the same participant on the same day sees the same number
+- **History**: trajectory views need stored snapshots — can't reconstruct after the fact
+- **Reproducibility**: `model_version` captured at compute time means audits can replay
+- **Cost**: one /batch call per cohort per week, vs ~50 /predict calls per facilitator session
+
+The dashboard in this repo simulates the read side (compute-on-demand with a 1-day TanStack cache + week selector for replay). When the production cron + table land, the dashboard's data layer swaps to read from the table instead — no UI changes.
+
 ### `POST /predict` — one participant
 
 ```json
