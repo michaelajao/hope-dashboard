@@ -76,6 +76,23 @@ type GenerateErrorState = {
     body: string;
 };
 
+const MODEL_VERSION_FALLBACKS: Record<string, string> = {
+    "stub-disabled": "stub (kill-switch)",
+    "safety-block": "safety block",
+    "error-fallback": "fallback",
+    "legacy-stub": "legacy stub",
+};
+
+function formatModelLabel(modelVersion: string): string {
+    if (MODEL_VERSION_FALLBACKS[modelVersion]) {
+        return MODEL_VERSION_FALLBACKS[modelVersion];
+    }
+    const afterSlash = modelVersion.includes("/")
+        ? modelVersion.split("/").pop()!
+        : modelVersion;
+    return afterSlash.replace(/-lora$/, "");
+}
+
 function classifyGenerateError(message: string): GenerateErrorState {
     const m = message.toLowerCase();
     if (
@@ -325,9 +342,12 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                         </span>
                     </CardTitle>
                     {response?.model_version && (
-                        <span className="inline-flex items-center gap-1.5 text-xs text-accent-ink">
+                        <span
+                            className="inline-flex items-center gap-1.5 text-xs text-accent-ink"
+                            title={response.model_version}
+                        >
                             <Sparkles className="h-3.5 w-3.5" aria-hidden />
-                            Drafted by SLM
+                            Drafted by {formatModelLabel(response.model_version)}
                         </span>
                     )}
                 </div>
