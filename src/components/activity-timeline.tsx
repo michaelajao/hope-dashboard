@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
     Activity,
     Bookmark,
@@ -16,19 +16,20 @@ import type { EventRecord, ParticipantHistory } from "@/lib/api/dropout";
 /**
  * Chronological activity feed for the detail panel.
  *
- * Reads the participant's real event stream (from the cohort bundle when
- * present, synthetic otherwise) and renders the most recent N events
- * grouped by day. Replaces the static InfoCardRow that occupied this
- * slot. Designed to feel "live" — when the platform webhook lands, this
- * surface will update without code changes.
+ * Two modes:
+ *  - Compact (default): 5 most-recent non-page-visit events as narrative
+ *    one-liners ("10d ago — Posted Gratitude: 'For Spring...'"). Quick
+ *    skim for the facilitator.
+ *  - Expanded: day-bucketed feed with icons + content snippets +
+ *    page-visit aggregations. Shows up to MAX_EXPANDED events.
  *
- * Page visits are aggregated per-day rather than rendered as individual
- * rows: a heavily-engaged participant generates 20+ page-visits per day
- * and a one-row-per-visit feed would drown out the substantive events
- * (posts, replies, logins).
+ * Page visits are collapsed in both modes — a heavily-engaged
+ * participant generates 100+ page-visits and per-row entries would
+ * drown out the substantive events (posts, replies, logins).
  */
 
-const MAX_EVENTS = 15;
+const COMPACT_ROWS = 5;
+const MAX_EXPANDED = 15;
 
 type DayBucket = {
     dayKey: string;
@@ -46,8 +47,6 @@ const ICONS: Record<EventRecord["event_type"], LucideIcon> = {
     facilitator_comment: MessageSquare,
 };
 
-/** Subtle accent per event type. Maps to oklch risk/neutral tokens so
- * the timeline reads as part of the surface, not a colourful sidebar. */
 const ACCENTS: Record<EventRecord["event_type"], string> = {
     activity: "text-accent-ink bg-accent/20",
     login: "text-text-2 bg-surface-2",
@@ -77,6 +76,19 @@ function timeOnly(date: Date): string {
     });
 }
 
+/** Compact relative time for the narrative rows. "Today", "Yesterday",
+ * "3d ago" up to a week; date otherwise. */
+function relativeTime(date: Date, now: Date): string {
+    const startOf = (d: Date) =>
+        new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const dayMs = 86_400_000;
+    const diffDays = Math.round((startOf(now) - startOf(date)) / dayMs);
+    if (diffDays === 0) return "Today";
+    if (diffDays === 1) return "Yesterday";
+    if (diffDays < 14) return `${diffDays}d ago`;
+    return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
 function eventLabel(e: EventRecord): string {
     switch (e.event_type) {
         case "activity":
@@ -101,10 +113,22 @@ function snippet(e: EventRecord, max = 120): string | null {
     return text.slice(0, max - 1) + "…";
 }
 
-/** Bucket events by calendar day in descending order, with page visits
- * collapsed into a per-day count. Caps total visible events at MAX_EVENTS
- * so the panel doesn't run to a thousand rows for a heavily-engaged
- * participant. */
+/** One-line narrative for the compact mode. Combines the event label
+ * with a short snippet for content-carrying events; for logins the
+ * most-recent one becomes "Last login" so the row reads naturally. */
+function narrativeLine(
+    e: EventRecord,
+    isMostRecentLogin: boolean,
+): string {
+    if (e.event_type === "login") {
+        return isMostRecentLogin ? "Last login" : "Logged in";
+    }
+    const snip = snippet(e, 80);
+    const label = eventLabel(e);
+    if (!snip) return label;
+    return `${label}: “${snip}”`;
+}
+
 function bucketEvents(events: EventRecord[], now: Date): DayBucket[] {
     const sorted = [...events].sort((a, b) =>
         b.timestamp.localeCompare(a.timestamp),
@@ -129,13 +153,11 @@ function bucketEvents(events: EventRecord[], now: Date): DayBucket[] {
             bucket.pageVisitCount += 1;
             continue;
         }
-        if (kept >= MAX_EVENTS) continue;
+        if (kept >= MAX_EXPANDED) continue;
         bucket.events.push(e);
         kept += 1;
     }
 
-    // Drop empty buckets (a day with only page visits and nothing else
-    // doesn't earn a header).
     return Array.from(buckets.values()).filter(
         (b) => b.events.length > 0 || b.pageVisitCount > 0,
     );
@@ -146,12 +168,35 @@ export function ActivityTimeline({
 }: {
     history: ParticipantHistory;
 }) {
+    const [expanded, setExpanded] = useState(false);
+    const now = useMemo(() => new Date(), []);
+
+    // Compact-mode rows: most-recent non-page-visit events as narrative
+    // one-liners. Identify the most-recent login so its row reads "Last
+    // login" rather than the generic "Logged in".
+    const compactRows = useMemo(() => {
+        const sorted = [...history.events]
+            .filter((e) => e.event_type !== "page_visit")
+            .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+        const mostRecentLoginTs = sorted.find(
+            (e) => e.event_type === "login",
+        )?.timestamp;
+        return sorted.slice(0, COMPACT_ROWS).map((e) => ({
+            event: e,
+            line: narrativeLine(
+                e,
+                e.event_type === "login" && e.timestamp === mostRecentLoginTs,
+            ),
+            when: relativeTime(new Date(e.timestamp), now),
+        }));
+    }, [history.events, now]);
+
     const buckets = useMemo(
-        () => bucketEvents(history.events, new Date()),
-        [history.events],
+        () => bucketEvents(history.events, now),
+        [history.events, now],
     );
 
-    if (buckets.length === 0) {
+    if (compactRows.length === 0 && buckets.length === 0) {
         return (
             <div className="rounded-md border border-border bg-surface-2 px-3 py-6">
                 <EmptyState
@@ -168,66 +213,90 @@ export function ActivityTimeline({
                 <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">
                     Recent activity
                 </h4>
-                <span className="text-xs text-muted">
-                    Last {Math.min(MAX_EVENTS, history.events.length)} events
-                </span>
+                <button
+                    type="button"
+                    onClick={() => setExpanded((v) => !v)}
+                    className="text-xs text-accent-ink hover:underline"
+                >
+                    {expanded ? "Show less" : "Full history →"}
+                </button>
             </div>
-            <ol className="space-y-3">
-                {buckets.map((b) => (
-                    <li key={b.dayKey}>
-                        <div className="mb-1.5 flex items-baseline gap-2">
-                            <span className="text-xs font-semibold text-text-2">
-                                {b.label}
+
+            {!expanded ? (
+                <ol className="divide-y divide-border rounded-md border border-border bg-surface-2">
+                    {compactRows.map((r) => (
+                        <li
+                            key={r.event.timestamp + r.event.event_type}
+                            className="flex items-start gap-3 px-3 py-2.5 text-sm"
+                        >
+                            <span className="w-16 shrink-0 text-xs text-muted">
+                                {r.when}
                             </span>
-                            {b.pageVisitCount > 0 && (
-                                <span className="text-xs text-muted">
-                                    · viewed {b.pageVisitCount}{" "}
-                                    {b.pageVisitCount === 1 ? "page" : "pages"}
+                            <span className="min-w-0 flex-1 text-text-2">
+                                {r.line}
+                            </span>
+                        </li>
+                    ))}
+                </ol>
+            ) : (
+                <ol className="space-y-3">
+                    {buckets.map((b) => (
+                        <li key={b.dayKey}>
+                            <div className="mb-1.5 flex items-baseline gap-2">
+                                <span className="text-xs font-semibold text-text-2">
+                                    {b.label}
                                 </span>
-                            )}
-                        </div>
-                        <ul className="space-y-1.5">
-                            {b.events.map((e) => {
-                                const Icon = ICONS[e.event_type] ?? Activity;
-                                const accent = ACCENTS[e.event_type] ?? ACCENTS.login;
-                                const text = snippet(e);
-                                return (
-                                    <li
-                                        key={e.timestamp + e.event_type}
-                                        className="flex gap-2.5 rounded-md border border-border bg-surface-2 px-2.5 py-2"
-                                    >
-                                        <div
-                                            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${accent}`}
+                                {b.pageVisitCount > 0 && (
+                                    <span className="text-xs text-muted">
+                                        · viewed {b.pageVisitCount}{" "}
+                                        {b.pageVisitCount === 1 ? "page" : "pages"}
+                                    </span>
+                                )}
+                            </div>
+                            <ul className="space-y-1.5">
+                                {b.events.map((e) => {
+                                    const Icon = ICONS[e.event_type] ?? Activity;
+                                    const accent =
+                                        ACCENTS[e.event_type] ?? ACCENTS.login;
+                                    const text = snippet(e);
+                                    return (
+                                        <li
+                                            key={e.timestamp + e.event_type}
+                                            className="flex gap-2.5 rounded-md border border-border bg-surface-2 px-2.5 py-2"
                                         >
-                                            <Icon
-                                                className="h-3.5 w-3.5"
-                                                aria-hidden
-                                            />
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                            <div className="flex items-baseline justify-between gap-2">
-                                                <span className="text-sm text-text">
-                                                    {eventLabel(e)}
-                                                </span>
-                                                <span className="shrink-0 text-xs text-muted">
-                                                    {timeOnly(
-                                                        new Date(e.timestamp),
-                                                    )}
-                                                </span>
+                                            <div
+                                                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${accent}`}
+                                            >
+                                                <Icon
+                                                    className="h-3.5 w-3.5"
+                                                    aria-hidden
+                                                />
                                             </div>
-                                            {text && (
-                                                <p className="mt-0.5 line-clamp-2 text-xs text-text-2">
-                                                    {text}
-                                                </p>
-                                            )}
-                                        </div>
-                                    </li>
-                                );
-                            })}
-                        </ul>
-                    </li>
-                ))}
-            </ol>
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-baseline justify-between gap-2">
+                                                    <span className="text-sm text-text">
+                                                        {eventLabel(e)}
+                                                    </span>
+                                                    <span className="shrink-0 text-xs text-muted">
+                                                        {timeOnly(
+                                                            new Date(e.timestamp),
+                                                        )}
+                                                    </span>
+                                                </div>
+                                                {text && (
+                                                    <p className="mt-0.5 line-clamp-2 text-xs text-text-2">
+                                                        {text}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        </li>
+                    ))}
+                </ol>
+            )}
         </div>
     );
 }

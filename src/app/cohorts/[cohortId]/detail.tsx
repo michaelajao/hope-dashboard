@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { Clock, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ import { DriverBars } from "@/components/driver-bars";
 import { useParticipantPrediction } from "@/lib/hooks/api";
 import { useCohortBundle } from "@/lib/hooks/useCohortBundle";
 import { syntheticHistory } from "@/lib/demo-events";
-import { bundleToHistory } from "@/lib/realCohort";
+import { bundleParticipantIds, bundleToHistory } from "@/lib/realCohort";
 import { useUiStore } from "@/lib/store/uiStore";
 import { useQueueStore } from "@/lib/store/queueStore";
 import { friendlyStatus } from "@/lib/risk";
@@ -43,6 +43,20 @@ export function Detail({ cohortId }: { cohortId: number }) {
         return syntheticHistory(selectedId);
     }, [selectedId, bundle.data]);
     const prediction = useParticipantPrediction(history);
+
+    // Neighbour navigation: derive prev/next from the cohort bundle's
+    // participant order. Falls back to no-op when the bundle hasn't
+    // loaded yet (the arrows just disable in that case).
+    const neighbours = useMemo(() => {
+        if (!bundle.data || !selectedId) return { prev: null, next: null };
+        const ids = bundleParticipantIds(bundle.data);
+        const idx = ids.indexOf(selectedId);
+        if (idx < 0) return { prev: null, next: null };
+        return {
+            prev: idx > 0 ? ids[idx - 1] : null,
+            next: idx < ids.length - 1 ? ids[idx + 1] : null,
+        };
+    }, [bundle.data, selectedId]);
 
     function onSnooze() {
         if (!selectedId) return;
@@ -98,6 +112,41 @@ export function Detail({ cohortId }: { cohortId: number }) {
                                 {status.label}
                             </Badge>
                         )}
+                        <div className="flex items-center rounded-md border border-border">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() =>
+                                    neighbours.prev && select(neighbours.prev)
+                                }
+                                disabled={!neighbours.prev}
+                                aria-label="Previous participant"
+                                title="Previous participant"
+                                className="h-8 w-8 rounded-r-none"
+                            >
+                                <ChevronLeft
+                                    className="h-4 w-4"
+                                    aria-hidden
+                                />
+                            </Button>
+                            <span className="border-l border-border" />
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() =>
+                                    neighbours.next && select(neighbours.next)
+                                }
+                                disabled={!neighbours.next}
+                                aria-label="Next participant"
+                                title="Next participant"
+                                className="h-8 w-8 rounded-l-none"
+                            >
+                                <ChevronRight
+                                    className="h-4 w-4"
+                                    aria-hidden
+                                />
+                            </Button>
+                        </div>
                         <Button
                             variant="secondary"
                             size="sm"
