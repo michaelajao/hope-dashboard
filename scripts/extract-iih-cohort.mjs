@@ -115,16 +115,21 @@ function picks0Module(users) {
     return users[0]?.moduleId ?? null;
 }
 
+/**
+ * All cohort learners, ranked by activity count (descending) so the
+ * heaviest-engagement participants appear first in the bundle order.
+ * The queue panel re-ranks by risk at render time; this ordering is
+ * just a stable initial sort.
+ *
+ * Previously this picked a 6-person representative slice (top-2 /
+ * mid-2 / bot-2) to keep the demo bundle tractable. With pagination
+ * in the queue we surface the full cohort — facilitators get a real
+ * triage experience.
+ */
 function pickRepresentative(users) {
-    const ranked = users
+    return users
         .map((u) => ({ ...u, activityCount: u.activities.length }))
         .sort((a, b) => b.activityCount - a.activityCount);
-    if (ranked.length <= 6) return ranked;
-    const top2 = ranked.slice(0, 2);
-    const bot2 = ranked.slice(-2);
-    const midStart = Math.floor((ranked.length - 2) / 2);
-    const mid2 = ranked.slice(midStart, midStart + 2);
-    return [...top2, ...mid2, ...bot2];
 }
 
 function shortBio(profile, fallback) {
@@ -260,16 +265,22 @@ function main() {
     fs.writeFileSync(OUTPUT_PATH, JSON.stringify(out, null, 2));
     const sizeKb = (fs.statSync(OUTPUT_PATH).size / 1024).toFixed(1);
     console.log(`wrote ${OUTPUT_PATH} (${sizeKb} KB)`);
-    console.log("summary:");
+
+    // Summary: top-10 most engaged + cohort-level event totals. 51 rows
+    // would be noisy; what we care about is "does the bundle look right".
+    const totals = { activity: 0, login: 0, page_visit: 0, facilitator_comment: 0, bookmark: 0, discussion_post: 0 };
     for (const p of participants) {
+        for (const e of p.events) {
+            totals[e.event_type] = (totals[e.event_type] ?? 0) + 1;
+        }
+    }
+    console.log(`cohort totals: ${participants.length} participants`);
+    console.log(`  events: ${Object.entries(totals).map(([k, v]) => `${k.slice(0, 4)}:${v}`).join(" ")}`);
+    console.log("top 10 by activity count:");
+    for (const p of participants.slice(0, 10)) {
         const hasBio = p.bio.startsWith("Joined the IIH") ? "—" : "bio";
-        const byType = {};
-        for (const e of p.events) byType[e.event_type] = (byType[e.event_type] ?? 0) + 1;
-        const evDetail = Object.entries(byType)
-            .map(([k, v]) => `${k.slice(0, 4)}:${v}`)
-            .join(" ");
         console.log(
-            `  ${p.displayName}  uid=${p.participant_id}  events=${p.events.length} (${evDetail})  ${hasBio}`,
+            `  ${p.displayName.padEnd(4)} uid=${p.participant_id}  events=${String(p.events.length).padStart(4)}  ${hasBio}`,
         );
     }
 }
