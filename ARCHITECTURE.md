@@ -74,7 +74,7 @@ useCohortBundle hook (TanStack Query, staleTime: ONE_DAY)
     │       feeds /api/proxy/dropout/predict, /api/proxy/dropout/batch
     │       and /api/proxy/generate
     │
-    └─▶ replyRateLastNDays, daysSinceLastEvent, etc. (src/lib/signals.ts)
+    └─▶ daysSinceLastEvent, facilitatorContactCount, etc. (src/lib/signals.ts)
             feeds the engagement-signals tile
 ```
 

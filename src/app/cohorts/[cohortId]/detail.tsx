@@ -15,7 +15,6 @@ import { MetricGrid, MetricTile } from "@/components/metric-tile";
 import { DriverBars } from "@/components/driver-bars";
 import { useParticipantPrediction } from "@/lib/hooks/api";
 import { useCohortBundle } from "@/lib/hooks/useCohortBundle";
-import { syntheticHistory } from "@/lib/demo-events";
 import { bundleParticipantIds, bundleToHistory } from "@/lib/realCohort";
 import {
     scoreAtDay as scoreAtDayForWeek,
@@ -24,20 +23,18 @@ import {
 import { useUiStore } from "@/lib/store/uiStore";
 import { useQueueStore } from "@/lib/store/queueStore";
 import { friendlyStatus } from "@/lib/risk";
+import type { ParticipantHistory } from "@/lib/api/dropout";
 import {
     daysSinceLastEvent,
     displayName,
     eventsLastNDays,
     facilitatorContactCount,
-    replyRateLastNDays,
 } from "@/lib/signals";
 
 export function Detail({
     cohortId,
-    programmeLengthDays,
 }: {
     cohortId: number;
-    programmeLengthDays: number;
 }) {
     const selectedId = useUiStore((s) => s.selectedParticipantId);
     const select = useUiStore((s) => s.selectParticipant);
@@ -47,13 +44,9 @@ export function Detail({
     const scoreAtWeek = useScoringStore((s) => s.scoreAtWeek);
     const scoreAt = scoreAtDayForWeek(scoreAtWeek);
     const history = useMemo(() => {
-        if (!selectedId) return null;
-        if (bundle.data) {
-            const real = bundleToHistory(bundle.data, selectedId, scoreAt);
-            if (real) return real;
-        }
-        return syntheticHistory(selectedId, scoreAt, programmeLengthDays);
-    }, [selectedId, bundle.data, scoreAt, programmeLengthDays]);
+        if (!selectedId || !bundle.data) return null;
+        return bundleToHistory(bundle.data, selectedId, scoreAt);
+    }, [selectedId, bundle.data, scoreAt]);
     const prediction = useParticipantPrediction(history, cohortId);
 
     // Neighbour navigation: derive prev/next from the cohort bundle's
@@ -244,11 +237,10 @@ export function Detail({
 function DetailMetrics({
     history,
 }: {
-    history: ReturnType<typeof syntheticHistory>;
+    history: ParticipantHistory;
 }) {
     const lastActiveDays = daysSinceLastEvent(history);
     const discussion = eventsLastNDays(history, "discussion_post", 14);
-    const reply = replyRateLastNDays(history, 14);
     const facilitatorTouches = facilitatorContactCount(history);
 
     const lastActiveTone =
@@ -263,14 +255,6 @@ function DetailMetrics({
             : discussion.deltaPercent <= -30
               ? "negative"
               : discussion.deltaPercent >= 30
-                ? "positive"
-                : "neutral";
-    const replyTone =
-        reply.ratePercent === null
-            ? "neutral"
-            : reply.ratePercent < 30
-              ? "negative"
-              : reply.ratePercent >= 70
                 ? "positive"
                 : "neutral";
 
@@ -294,20 +278,6 @@ function DetailMetrics({
                         : `${discussion.deltaPercent >= 0 ? "+" : ""}${discussion.deltaPercent}% vs prior 14d`
                 }
                 tone={discussionTone}
-            />
-            <MetricTile
-                label="Reply rate"
-                value={
-                    reply.ratePercent === null
-                        ? "n/a"
-                        : `${reply.ratePercent}%`
-                }
-                delta={
-                    reply.ratePercent === null
-                        ? "no posts in 14d"
-                        : `${reply.replies}/${reply.activities} posts replied in 14d`
-                }
-                tone={replyTone}
             />
             <MetricTile
                 label="Facilitator contact"

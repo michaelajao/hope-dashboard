@@ -1,13 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { auth } from "@/auth";
 import { commentGen } from "@/lib/api/server";
 import { ApiError } from "@/lib/api/client";
 import type { GenerateRequest } from "@/lib/api/commentGen";
 
+// Auth removed — gating delegated to the Hope Move platform layer.
 export async function POST(req: NextRequest) {
-    const session = await auth();
-    if (!session) return new NextResponse("Unauthorized", { status: 401 });
     try {
         const body = (await req.json()) as GenerateRequest;
         const data = await commentGen().generate(body);

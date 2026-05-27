@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { ChevronsLeft, ChevronsRight } from "lucide-react";
 
 const PAGE_SIZE = 10;
 
@@ -12,7 +13,7 @@ import { QueueItem } from "@/components/queue-item";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCohortBatch } from "@/lib/hooks/api";
 import { useCohortBundle } from "@/lib/hooks/useCohortBundle";
-import { syntheticBatch, syntheticHistory } from "@/lib/demo-events";
+import { useQueueLayoutStore } from "@/lib/store/queueLayoutStore";
 import { bundleParticipantIds, bundleToHistory } from "@/lib/realCohort";
 import {
     scoreAtDay as scoreAtDayForWeek,
@@ -40,30 +41,15 @@ export function Queue({ cohort }: { cohort: CohortMeta }) {
     const scoreAtWeek = useScoringStore((s) => s.scoreAtWeek);
     const scoreAt = scoreAtDayForWeek(scoreAtWeek);
     const histories: ParticipantHistory[] = useMemo(() => {
-        if (bundle.data) {
-            // Real bundle present — build histories from real events up to
-            // the currently-selected programme week. programmeLengthDays
-            // comes from the cohort bundle so the API gets cohort-true
-            // metadata instead of a 42-day default.
-            return bundleParticipantIds(bundle.data)
-                .map((id) => bundleToHistory(bundle.data!, id, scoreAt))
-                .filter((h): h is ParticipantHistory => h !== null);
-        }
-        // Fallback: synthetic stream so the dashboard still renders in CI /
-        // fresh clones where the bundle file is absent. Pass the cohort's
-        // declared length so synthetic histories stay consistent with the
-        // queue's week selector.
-        return syntheticBatch(
-            cohort.demoParticipants,
-            scoreAt,
-            cohort.programmeLengthDays,
-        );
-    }, [
-        bundle.data,
-        cohort.demoParticipants,
-        cohort.programmeLengthDays,
-        scoreAt,
-    ]);
+        if (!bundle.data) return [];
+        // Real bundle present — build histories from real events up to
+        // the currently-selected programme week. programmeLengthDays
+        // comes from the cohort bundle so the API gets cohort-true
+        // metadata instead of a 42-day default.
+        return bundleParticipantIds(bundle.data)
+            .map((id) => bundleToHistory(bundle.data!, id, scoreAt))
+            .filter((h): h is ParticipantHistory => h !== null);
+    }, [bundle.data, scoreAt]);
 
     const histLookup = useMemo(() => {
         const m = new Map<string, ParticipantHistory>();
@@ -126,12 +112,51 @@ export function Queue({ cohort }: { cohort: CohortMeta }) {
     const pageEnd = Math.min(pageStart + PAGE_SIZE, visible.length);
     const pageItems = visible.slice(pageStart, pageEnd);
 
+    const collapsed = useQueueLayoutStore((s) => s.collapsed);
+    const toggleCollapsed = useQueueLayoutStore((s) => s.toggle);
+
+    // Collapsed rail: a thin vertical card that preserves the count
+    // (situational awareness) and lets the facilitator re-expand with
+    // one click. Only renders at lg+ — at smaller breakpoints the queue
+    // is a full-width row above the detail panel and collapsing it
+    // would just create empty space.
+    if (collapsed) {
+        return (
+            <Card className="hidden flex-col items-center gap-3 py-3 lg:flex">
+                <button
+                    type="button"
+                    onClick={toggleCollapsed}
+                    aria-label="Expand follow-up queue"
+                    title="Expand follow-up queue"
+                    className="rounded p-1 text-muted hover:bg-surface-2 hover:text-text"
+                >
+                    <ChevronsRight className="h-4 w-4" aria-hidden />
+                </button>
+                <Badge variant="neutral">{visible.length}</Badge>
+                <span className="rotate-180 text-xs font-semibold uppercase tracking-wide text-muted [writing-mode:vertical-rl]">
+                    Follow-up queue
+                </span>
+            </Card>
+        );
+    }
+
     return (
         <Card className="flex flex-col">
             <CardHeader>
                 <div className="flex items-center justify-between">
                     <CardTitle>Follow-up queue</CardTitle>
-                    <Badge variant="neutral">{visible.length}</Badge>
+                    <div className="flex items-center gap-2">
+                        <Badge variant="neutral">{visible.length}</Badge>
+                        <button
+                            type="button"
+                            onClick={toggleCollapsed}
+                            aria-label="Collapse follow-up queue"
+                            title="Collapse follow-up queue"
+                            className="hidden rounded p-1 text-muted hover:bg-surface-2 hover:text-text lg:inline-flex"
+                        >
+                            <ChevronsLeft className="h-4 w-4" aria-hidden />
+                        </button>
+                    </div>
                 </div>
                 <div className="space-y-2 pt-2">
                     <Input
@@ -179,13 +204,8 @@ export function Queue({ cohort }: { cohort: CohortMeta }) {
                     </p>
                 )}
                 {pageItems.map((p) => {
-                    const hist =
-                        histLookup.get(p.participant_id) ??
-                        syntheticHistory(
-                            p.participant_id,
-                            scoreAt,
-                            cohort.programmeLengthDays,
-                        );
+                    const hist = histLookup.get(p.participant_id);
+                    if (!hist) return null;
                     return (
                         <QueueItem
                             key={p.participant_id}

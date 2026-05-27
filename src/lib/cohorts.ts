@@ -3,6 +3,13 @@
  * (master plan §7); future versions can hydrate from
  * engagement_ml's cohort metadata via a server action once the platform
  * feed is wired.
+ *
+ * The participant list is no longer carried here — the dashboard reads
+ * the real bundle from `local/iih-coh12-110226.json` (extracted from the
+ * platform JSON exports by `scripts/extract-iih-cohort.mjs`). The
+ * synthetic-id fallback was removed; if the bundle is missing the queue
+ * surfaces an explicit "bundle missing" state instead of silently
+ * fabricating data.
  */
 
 export type CohortMeta = {
@@ -17,11 +24,6 @@ export type CohortMeta = {
      * T ∈ {7,14,21,28,35,42} so any score_at_day above 42 anchors to
      * 42 (see `scoringStore.MODEL_MAX_HORIZON_DAYS`). */
     programmeLengthDays: number;
-    /** Synthetic participant ids for the demo. The dropout client now
-     * speaks the event-record contract; `src/lib/demo-events.ts` produces
-     * a deterministic `ParticipantHistory` per id so the dashboard can
-     * render even without an active platform feed. */
-    demoParticipants: string[];
 };
 
 export const COHORTS: CohortMeta[] = [
@@ -31,14 +33,6 @@ export const COHORTS: CohortMeta[] = [
         moduleId: 337,
         moduleName: "People living with IIH 2025 — V1",
         programmeLengthDays: 42,
-        demoParticipants: [
-            "iih-coh12-001",
-            "iih-coh12-002",
-            "iih-coh12-003",
-            "iih-coh12-004",
-            "iih-coh12-005",
-            "iih-coh12-006",
-        ],
     },
 ];
 

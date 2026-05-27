@@ -4,18 +4,25 @@ import { useQuery } from "@tanstack/react-query";
 
 import type { CohortBundle } from "@/lib/server/cohort-data";
 
-const ONE_HOUR = 60 * 60 * 1000;
+const THIRTY_SECONDS = 30 * 1000;
 
 /**
- * Fetch the real cohort bundle (server-side loaded from `local/`).
+ * Fetch the cohort bundle (loaded server-side from
+ * `local/iih-coh12-110226.json`).
  *
  * Returns:
  *  - data: CohortBundle when the file is on disk
- *  - data: null when the route 204s (CI / fresh clone / bundle missing)
+ *  - data: null when the route 204s (bundle file removed)
  *
- * Consumers should branch on `data` and fall back to synthetic generators
- * when null. Auth-gated via NextAuth; an unauthenticated request rejects
- * at the proxy and React Query surfaces an error.
+ * The synthetic-fallback path was removed; consumers should treat
+ * `data === null` as an explicit "bundle missing" state. The route is
+ * unauthenticated — facilitator auth will be wired on the original
+ * Hope Move platform.
+ *
+ * `staleTime: 30s` so re-running `scripts/extract-iih-cohort.mjs` during
+ * development picks up in the browser within half a minute instead of
+ * needing a hard-reload. The server-side loader is mtime-aware (see
+ * `cohort-data.ts`) so the new bundle is read immediately on next fetch.
  */
 export function useCohortBundle() {
     return useQuery({
@@ -30,8 +37,7 @@ export function useCohortBundle() {
             }
             return (await res.json()) as CohortBundle;
         },
-        staleTime: ONE_HOUR,
-        // Single source of truth — never refetch on focus, bundle is static.
+        staleTime: THIRTY_SECONDS,
         refetchOnWindowFocus: false,
     });
 }

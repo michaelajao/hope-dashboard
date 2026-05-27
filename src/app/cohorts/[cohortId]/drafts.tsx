@@ -21,11 +21,7 @@ import {
     useParticipantPrediction,
     useThumb,
 } from "@/lib/hooks/api";
-import {
-    demoEngagementContext,
-    syntheticHistory,
-    weekNumber,
-} from "@/lib/demo-events";
+import { demoEngagementContext, weekNumber } from "@/lib/demo-events";
 import { seedDemoMemory } from "@/lib/demo-memory";
 import { getProfile } from "@/lib/profile";
 import { useCohortBundle } from "@/lib/hooks/useCohortBundle";
@@ -73,17 +69,9 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
     const scoreAtWeek = useScoringStore((s) => s.scoreAtWeek);
     const scoreAt = scoreAtDayForWeek(scoreAtWeek);
     const history = useMemo(() => {
-        if (!selectedId) return null;
-        if (bundle.data) {
-            const real = bundleToHistory(bundle.data, selectedId, scoreAt);
-            if (real) return real;
-        }
-        return syntheticHistory(
-            selectedId,
-            scoreAt,
-            cohort.programmeLengthDays,
-        );
-    }, [selectedId, bundle.data, scoreAt, cohort.programmeLengthDays]);
+        if (!selectedId || !bundle.data) return null;
+        return bundleToHistory(bundle.data, selectedId, scoreAt);
+    }, [selectedId, bundle.data, scoreAt]);
     const prediction = useParticipantPrediction(history, cohort.id);
 
     // Capture "now" once at mount. Using Date.now() inside useMemo would

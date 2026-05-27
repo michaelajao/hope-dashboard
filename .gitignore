@@ -46,9 +46,13 @@ dev-server.log
 
 .playwright-mcp/
 
-# Local-only cohort data extracted from Hope Move platform JSON exports.
-# Contains real participant bios + posts — keep out of the repo.
-local/
+# Cohort bundle extracted from Hope Move platform JSON exports lives at
+# `local/iih-coh12-110226.json`. Previously the entire `local/` directory
+# was gitignored to keep real participant data out of the repo; the demo
+# now ships the bundle in-tree so the dashboard is self-contained on any
+# host. Other ad-hoc files dropped into `local/` are still ignored.
+local/*
+!local/iih-coh12-110226.json
 
 # Ad-hoc Playwright screenshots and scratch
 viewport-*.png

@@ -28,7 +28,7 @@ export default function CohortsIndexPage() {
                             </CardHeader>
                             <CardContent>
                                 <p className="text-xs text-slate-500">
-                                    {c.demoParticipants.length} demo participants
+                                    Cohort #{c.id} · {c.programmeLengthDays}-day programme
                                 </p>
                             </CardContent>
                         </Card>

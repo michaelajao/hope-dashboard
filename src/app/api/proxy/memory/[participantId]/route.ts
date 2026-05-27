@@ -1,6 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { auth } from "@/auth";
 import { ApiError } from "@/lib/api/client";
 import { commentGen } from "@/lib/api/server";
 
@@ -16,12 +15,11 @@ import { commentGen } from "@/lib/api/server";
  * Real upstream errors (auth failures, malformed responses) still come
  * through with their original status so we don't paper over real bugs.
  */
+// Auth removed — gating delegated to the Hope Move platform layer.
 export async function GET(
     req: NextRequest,
     { params }: { params: Promise<{ participantId: string }> },
 ) {
-    const session = await auth();
-    if (!session) return new NextResponse("Unauthorized", { status: 401 });
     const { participantId } = await params;
     const cohort = req.nextUrl.searchParams.get("cohort_id");
     const limit = req.nextUrl.searchParams.get("limit");

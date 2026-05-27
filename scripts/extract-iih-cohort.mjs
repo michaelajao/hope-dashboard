@@ -21,7 +21,7 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
-const RAW_ROOT = "C:/Users/ajaoo/Desktop/engagement_ml/data";
+const RAW_ROOT = path.resolve(REPO_ROOT, "..", "comment_generation", "data");
 
 const TARGET_COHORT_ID = 1680;
 const TARGET_COHORT_NAME = "IIH-COH12-110226";
@@ -95,6 +95,10 @@ function extractFacilitatorReplies(fc, userIds) {
     for (const m of fc.modules ?? []) {
         for (const ua of m.userActivities ?? []) {
             if (!wanted.has(ua.userId)) continue;
+            // Skip facilitator replies anchored to Emotions activities —
+            // those parent activities are dropped from the bundle (see
+            // main()), so the reply would orphan in the timeline.
+            if (ua.typeName === "Emotions") continue;
             for (const fcEntry of ua.facilitatorComments ?? []) {
                 if (!out.has(ua.userId)) out.set(ua.userId, []);
                 out.get(ua.userId).push({
@@ -163,10 +167,10 @@ function eventFromActivity(a) {
 
 
 function main() {
-    // UserActivity_120526.txt is the May 25 2026 export — it's the first one
+    // "UserActivity (2).txt" is the May 26 2026 export — the first one
     // that includes module 337 (IIH 2025) where cohort 1680 lives. The older
     // "UserActivity (1).txt" stops at module 332 and excludes this cohort.
-    const ua = loadJson("UserActivity_120526.txt");
+    const ua = loadJson("UserActivity (2).txt");
     const up = loadJson("UserProfile (1).txt");
     const fc = loadJson("FacilitatorComments.txt");
 
@@ -202,6 +206,12 @@ function main() {
         const events = [];
         for (const a of u.activities ?? []) {
             if (!a.recorded) continue;
+            // Emotions activities are tag selections (e.g.
+            // "Scared;Irritable;Determined") and comment-gen rejects them
+            // as draft targets (no training pairs — see
+            // RETRAIN.md §1.2). Drop them from the bundle so the timeline
+            // doesn't surface posts the AI surface can't draft for.
+            if (a.typeName === "Emotions") continue;
             events.push(eventFromActivity(a));
         }
         for (const l of u.logins ?? []) {
@@ -245,7 +255,9 @@ function main() {
             finishedAt: u.finished ? normaliseTimestamp(u.finished) : null,
             events,
             priorFacilitatorReplies: facilitatorByUser.get(u.userId) ?? [],
-            activityCount: u.activityCount,
+            // Count post-Emotions-filter so the displayed activityCount
+            // matches what's actually in `events` and surfaces in the UI.
+            activityCount: events.filter((e) => e.event_type === "activity").length,
         };
     });
 

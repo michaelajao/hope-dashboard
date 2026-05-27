@@ -26,46 +26,10 @@ type SeedEntry = {
     daysAgo: number; // relative to "now" at seed time
 };
 
-const SEED_TEMPLATES: Record<string, SeedEntry[]> = {
-    "iih-coh12-001": [
-        {
-            activityType: "GoalSetting",
-            text: "I want to walk three times a week, even if just for ten minutes. The pressure changes are scary but I want to try.",
-            daysAgo: 28,
-        },
-        {
-            activityType: "Gratitude",
-            text: "Grateful for my partner who's been picking up extra at home while I figure this out.",
-            daysAgo: 21,
-        },
-    ],
-    "iih-coh12-002": [
-        // Was an Emotions seed pre-2026-05-27 — swapped to MyHOPE to
-        // match the (now-3-value) ActivityType enum.
-        {
-            activityType: "MyHOPE",
-            text: "I hope I can name what's happening before it overwhelms me. Monday's appointment was hard but the journal prompt helped.",
-            daysAgo: 18,
-        },
-        {
-            activityType: "MyHOPE",
-            text: "Reminded myself today that flare-ups are not failures.",
-            daysAgo: 9,
-        },
-    ],
-    "iih-coh12-003": [
-        {
-            activityType: "GoalSetting",
-            text: "Goal for the month: sleep 7 hours, no screens after 10pm.",
-            daysAgo: 24,
-        },
-        {
-            activityType: "Gratitude",
-            text: "Three nights of solid sleep this week — and the headaches dropped to a 4 from a 7.",
-            daysAgo: 12,
-        },
-    ],
-};
+// Synthetic SEED_TEMPLATES removed alongside the broader synthetic
+// fallback. Seeds now come exclusively from the real cohort bundle via
+// `buildSeedPostsFromBundle` / `buildSeedRepliesFromBundle`.
+const SEED_TEMPLATES: Record<string, SeedEntry[]> = {};
 
 export type SeededPost = {
     activity_id: number;

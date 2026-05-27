@@ -1,15 +1,18 @@
 /**
- * Server-only loader for the local Hope Move cohort bundle.
+ * Server-only loader for the Hope Move cohort bundle.
  *
  * The JSON at `local/iih-coh12-110226.json` is produced by
- * `scripts/extract-iih-cohort.mjs` from the engagement_ml/data raw
- * Hope Move platform exports. It contains real participant IDs, real
- * activity histories (when present), and real bios (when present) —
- * gitignored so the repo stays publishable.
+ * `scripts/extract-iih-cohort.mjs` from the platform exports in
+ * `../comment_generation/data/`. It contains real participant IDs and
+ * activity histories for cohort 1680 (IIH-COH12-110226). Bios fall back
+ * to a placeholder because the UserProfile export in hand doesn't cover
+ * module 337.
  *
- * Returns `null` if the bundle isn't on disk (CI, fresh clone, etc.);
- * client code then falls back to the synthetic generators in
- * `src/lib/demo-events.ts`.
+ * The bundle is committed in-tree so the dashboard is self-contained on
+ * any host. The synthetic-fallback path that previously rendered
+ * fake participants when the file was absent has been removed — if the
+ * file ever disappears, the API route returns 204 and the queue shows
+ * an empty state rather than fabricating data.
  */
 
 import fs from "node:fs";

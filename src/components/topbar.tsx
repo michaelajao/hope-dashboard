@@ -4,19 +4,30 @@ import { useMemo } from "react";
 import Link from "next/link";
 
 import { useCohortBatch } from "@/lib/hooks/api";
-import { syntheticBatch } from "@/lib/demo-events";
+import { useCohortBundle } from "@/lib/hooks/useCohortBundle";
+import { bundleParticipantIds, bundleToHistory } from "@/lib/realCohort";
+import {
+    scoreAtDay as scoreAtDayForWeek,
+    useScoringStore,
+} from "@/lib/store/scoringStore";
 import { useSessionStatsStore } from "@/lib/store/sessionStatsStore";
 import type { CohortMeta } from "@/lib/cohorts";
+import type { ParticipantHistory } from "@/lib/api/dropout";
 
 type TopbarProps = {
     cohort: CohortMeta;
 };
 
 export function Topbar({ cohort }: TopbarProps) {
-    const histories = useMemo(
-        () => syntheticBatch(cohort.demoParticipants),
-        [cohort.demoParticipants],
-    );
+    const bundle = useCohortBundle();
+    const scoreAtWeek = useScoringStore((s) => s.scoreAtWeek);
+    const scoreAt = scoreAtDayForWeek(scoreAtWeek);
+    const histories = useMemo<ParticipantHistory[]>(() => {
+        if (!bundle.data) return [];
+        return bundleParticipantIds(bundle.data)
+            .map((id) => bundleToHistory(bundle.data!, id, scoreAt))
+            .filter((h): h is ParticipantHistory => h !== null);
+    }, [bundle.data, scoreAt]);
     const { data } = useCohortBatch(histories, cohort.id);
     const sentThisSession = useSessionStatsStore((s) => s.sentThisSession);
 

@@ -1,6 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { auth } from "@/auth";
 import { ApiError } from "@/lib/api/client";
 import { commentGen } from "@/lib/api/server";
 import type { MemoryReplyRequest } from "@/lib/api/commentGen";
@@ -14,9 +13,8 @@ import type { MemoryReplyRequest } from "@/lib/api/commentGen";
  * comments — so the LLM's context includes the real conversational
  * back-and-forth, not just one side of it.
  */
+// Auth removed — gating delegated to the Hope Move platform layer.
 export async function POST(req: NextRequest) {
-    const session = await auth();
-    if (!session) return new NextResponse("Unauthorized", { status: 401 });
     try {
         const body = (await req.json()) as MemoryReplyRequest;
         const data = await commentGen().writeMemoryReply(body);
