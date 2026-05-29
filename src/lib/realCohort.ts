@@ -87,6 +87,7 @@ export function bundleToHistory(
             activity_type: e.activity_type,
             words_written: e.words_written,
             description: e.description ?? undefined,
+            topic_id: e.topicId,
         });
     }
 
@@ -142,4 +143,49 @@ function facilitatorDensity(bundle: CohortBundle): number {
         (p) => p.priorFacilitatorReplies.length > 0,
     ).length;
     return Number((touched / bundle.participants.length).toFixed(2));
+}
+
+/** Max thread replies + char budget fed to the model as forum context.
+ * Threads can run to ~90 replies; we keep the focal post plus a bounded
+ * window of what came before so the prompt stays small and on-point. */
+const THREAD_CONTEXT_MAX_REPLIES = 8;
+const THREAD_CONTEXT_MAX_CHARS = 1600;
+
+/**
+ * Render a forum topic into a compact text block for the comment-gen
+ * `thread_context` field: the topic title + the replies leading up to
+ * (and including) the focal post, in time order, each prefixed with the
+ * author alias. Capped to the last few replies + a char budget.
+ *
+ * `focalText` identifies the post being replied to (we match on the
+ * exact reply text, which is unique enough within a topic); everything
+ * after it is dropped so the model only sees prior context.
+ * Returns "" when the topic isn't in the bundle.
+ */
+export function renderThreadContext(
+    bundle: CohortBundle,
+    topicId: number | undefined,
+    focalText: string,
+): string {
+    if (topicId == null) return "";
+    const thread = bundle.discussionThreads?.[String(topicId)];
+    if (!thread) return "";
+
+    const focal = focalText.trim();
+    const upToFocal: typeof thread.replies = [];
+    for (const r of thread.replies) {
+        upToFocal.push(r);
+        if (r.text.trim() === focal) break;
+    }
+    const windowed = upToFocal.slice(-THREAD_CONTEXT_MAX_REPLIES);
+
+    const lines = [`Forum topic: "${thread.title}"`, ""];
+    for (const r of windowed) {
+        lines.push(`${r.alias}: ${r.text.trim()}`);
+    }
+    let block = lines.join("\n");
+    if (block.length > THREAD_CONTEXT_MAX_CHARS) {
+        block = block.slice(0, THREAD_CONTEXT_MAX_CHARS - 1) + "…";
+    }
+    return block;
 }

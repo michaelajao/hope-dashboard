@@ -47,6 +47,26 @@ export type RealEvent = {
     activity_type?: string;
     words_written?: number;
     description?: string | null;
+    /** Forum topic id for `discussion_post` events — links the post to
+     * its thread in `CohortBundle.discussionThreads` so the dashboard
+     * can show + draft against the full conversation. Absent on
+     * non-discussion events. */
+    topicId?: number;
+};
+
+/** One reply in a reconstructed forum thread. Authors outside the
+ * focal cohort are aliased generically ("Facilitator" / "A
+ * participant") so no cross-cohort identity leaks. */
+export type RealThreadReply = {
+    alias: string;
+    role: "facilitator" | "participant";
+    text: string;
+    recordedAt: string;
+};
+
+export type RealDiscussionThread = {
+    title: string;
+    replies: RealThreadReply[];
 };
 
 export type RealFacilitatorReply = {
@@ -81,6 +101,10 @@ export type CohortBundle = {
         programmeLengthDays: number;
     };
     participants: RealParticipant[];
+    /** Forum threads this cohort took part in, keyed by topic id.
+     * Optional for backward-compat with bundles extracted before forum
+     * support; treat `undefined` as "no forum data". */
+    discussionThreads?: Record<string, RealDiscussionThread>;
 };
 
 type CacheEntry = { bundle: CohortBundle | null; mtimeMs: number | null };

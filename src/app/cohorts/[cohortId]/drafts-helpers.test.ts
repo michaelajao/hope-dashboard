@@ -14,10 +14,10 @@ describe("formatModelLabel", () => {
         );
     });
 
-    it("preserves version segments (v5) and pretty-prints sizes", () => {
+    it("drops the v5 training-version token and pretty-prints sizes", () => {
         expect(
             formatModelLabel("michaelajao/qwen3-4b-hope-only-v5-lora"),
-        ).toBe("Qwen3 4B v5");
+        ).toBe("Qwen3 4B");
     });
 
     it("handles the smallest model id", () => {

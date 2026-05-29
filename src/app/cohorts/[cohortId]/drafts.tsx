@@ -14,6 +14,7 @@ import {
 import { EmptyState } from "@/components/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DraftCard, type DraftContext } from "@/components/draft-card";
+import { DiscussionThread } from "@/components/discussion-thread";
 import { FollowUpActivity } from "@/components/follow-up-activity";
 import {
     useEvent,
@@ -25,7 +26,11 @@ import { demoEngagementContext, weekNumber } from "@/lib/demo-events";
 import { seedDemoMemory } from "@/lib/demo-memory";
 import { getProfile } from "@/lib/profile";
 import { useCohortBundle } from "@/lib/hooks/useCohortBundle";
-import { bundleToHistory, findRealParticipant } from "@/lib/realCohort";
+import {
+    bundleToHistory,
+    findRealParticipant,
+    renderThreadContext,
+} from "@/lib/realCohort";
 import {
     scoreAtDay as scoreAtDayForWeek,
     useScoringStore,
@@ -100,6 +105,10 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
     const selectedPostTs = useUiStore((s) => s.selectedPostTs);
     const recentPost = useMemo(() => {
         if (!history) return null;
+        // Default auto-pick is the newest draftable ACTIVITY (the
+        // primary flow). Discussion/forum posts are never auto-picked —
+        // a facilitator opts into replying to one by clicking it in the
+        // timeline (sets selectedPostTs).
         const acts = history.events
             .filter(
                 (e) =>
@@ -114,21 +123,34 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                     e.activity_type !== "Emotions",
             )
             .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
-        // If the facilitator picked a specific past post from the
-        // timeline, draft against that. Otherwise default to the newest.
+        // An explicit timeline pick may be an activity OR a forum post.
         const picked = selectedPostTs
-            ? acts.find((e) => e.timestamp === selectedPostTs)
+            ? history.events.find(
+                  (e) =>
+                      e.timestamp === selectedPostTs &&
+                      (e.event_type === "activity" ||
+                          e.event_type === "discussion_post") &&
+                      (e.description ?? "").trim().length > 0,
+              )
             : undefined;
         const latest = picked ?? acts[0];
         if (!latest) return null;
         const ageMs = nowMs - new Date(latest.timestamp).getTime();
         const daysAgo = Math.max(0, Math.floor(ageMs / DAY_MS));
-        const at: ActivityType =
-            (latest.activity_type as ActivityType | undefined) ?? "GoalSetting";
+        const isDiscussion = latest.event_type === "discussion_post";
+        // Forum posts are typed "Discussion" (server-side enum); cast
+        // through unknown because the dashboard ActivityType union stays
+        // narrow (GoalSetting/Gratitude/MyHOPE) by design.
+        const at: ActivityType = isDiscussion
+            ? ("Discussion" as unknown as ActivityType)
+            : ((latest.activity_type as ActivityType | undefined) ??
+              "GoalSetting");
         return {
             text: (latest.description ?? "").trim(),
             activityType: at,
             daysAgo,
+            isDiscussion,
+            topicId: latest.topic_id,
         };
     }, [history, nowMs, selectedPostTs]);
 
@@ -138,6 +160,11 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
     const postText: string = recentPost?.text ?? "";
     const activityType: ActivityType =
         recentPost?.activityType ?? "GoalSetting";
+    const isDiscussionTarget = recentPost?.isDiscussion ?? false;
+    const currentThread =
+        isDiscussionTarget && recentPost?.topicId != null
+            ? bundle.data?.discussionThreads?.[String(recentPost.topicId)]
+            : undefined;
 
     // Switching participants clears the response, active tab, and any
     // errors. These are legitimate side effects (not derived state) —
@@ -189,7 +216,17 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
         if (!selectedId) return;
         setError(null);
         const profile = getProfile(selectedId, bundle.data ?? null);
-        const body: GenerateRequest = {
+        // For a forum-reply target, feed the reconstructed thread so the
+        // model replies in context. Empty string for activity targets.
+        const threadContext =
+            isDiscussionTarget && bundle.data
+                ? renderThreadContext(
+                      bundle.data,
+                      recentPost?.topicId,
+                      postText,
+                  )
+                : "";
+        const body: GenerateRequest & { thread_context?: string } = {
             participant_id: Number(
                 String(selectedId).replace(/[^0-9]/g, "") || "0",
             ),
@@ -206,6 +243,7 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                       ...demoEngagementContext(history),
                   }
                 : undefined,
+            ...(threadContext ? { thread_context: threadContext } : {}),
         };
         generate.mutate(body, {
             onSuccess: (res) => {
@@ -297,7 +335,7 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                     <div className="space-y-2">
                         <div className="flex items-baseline justify-between gap-2">
                             <label className="text-xs font-semibold uppercase tracking-wide text-muted">
-                                Participant post
+                                {isDiscussionTarget ? "Forum post" : "Participant post"}
                             </label>
                             <span className="text-xs text-muted">
                                 from{" "}
@@ -306,16 +344,27 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                                     : `${recentPost.daysAgo}d ago`}
                             </span>
                         </div>
-                        <div className="rounded-md border border-border bg-surface-2 px-3 py-2.5">
-                            <div className="mb-1.5 flex items-center gap-1.5">
-                                <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[10px] font-medium text-accent-ink">
-                                    {recentPost.activityType}
-                                </span>
+                        {isDiscussionTarget && currentThread ? (
+                            // Forum target: show the whole thread with the
+                            // focal post highlighted, instead of the bare
+                            // post card. The model gets the same thread as
+                            // context via thread_context.
+                            <DiscussionThread
+                                thread={currentThread}
+                                focalText={recentPost.text}
+                            />
+                        ) : (
+                            <div className="rounded-md border border-border bg-surface-2 px-3 py-2.5">
+                                <div className="mb-1.5 flex items-center gap-1.5">
+                                    <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[10px] font-medium text-accent-ink">
+                                        {recentPost.activityType}
+                                    </span>
+                                </div>
+                                <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">
+                                    {recentPost.text}
+                                </p>
                             </div>
-                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-text">
-                                {recentPost.text}
-                            </p>
-                        </div>
+                        )}
                     </div>
                 ) : (
                     <div className="rounded-md border border-border bg-surface-2 px-3 py-6 text-center">
@@ -345,7 +394,9 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                             ? "Generating…"
                             : response
                               ? "Regenerate"
-                              : "Generate drafts"}
+                              : isDiscussionTarget
+                                ? "Generate reply"
+                                : "Generate drafts"}
                     </Button>
                     <Button
                         type="button"
@@ -466,41 +517,49 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                     };
                     return (
                         <div className="space-y-3">
-                            <div className="space-y-1.5">
-                                <span className="text-xs font-semibold uppercase tracking-wide text-muted">
-                                    Suggested tone
-                                </span>
-                                <div
-                                    role="tablist"
-                                    aria-label="Draft tone"
-                                    className="flex flex-wrap gap-1 rounded-md bg-surface-2 p-1"
-                                >
-                                    {drafts.map((d) => {
-                                        const isActive =
-                                            d.persona === current.persona;
-                                        return (
-                                            <button
-                                                key={String(d.draft_id)}
-                                                role="tab"
-                                                aria-selected={isActive}
-                                                type="button"
-                                                onClick={() =>
-                                                    setActivePersona(d.persona)
-                                                }
-                                                className={
-                                                    "flex-1 rounded px-3 py-1.5 text-xs font-medium transition-colors " +
-                                                    (isActive
-                                                        ? "bg-surface text-text shadow-sm"
-                                                        : "text-muted hover:text-text-2")
-                                                }
-                                            >
-                                                {PERSONA_TAB_LABEL[d.persona] ??
-                                                    d.persona}
-                                            </button>
-                                        );
-                                    })}
+                            {/* Persona tabs only when the model returned
+                                multiple drafts. Forum replies come back as
+                                a single warm reply — no tone choice. */}
+                            {drafts.length > 1 && (
+                                <div className="space-y-1.5">
+                                    <span className="text-xs font-semibold uppercase tracking-wide text-muted">
+                                        Suggested tone
+                                    </span>
+                                    <div
+                                        role="tablist"
+                                        aria-label="Draft tone"
+                                        className="flex flex-wrap gap-1 rounded-md bg-surface-2 p-1"
+                                    >
+                                        {drafts.map((d) => {
+                                            const isActive =
+                                                d.persona === current.persona;
+                                            return (
+                                                <button
+                                                    key={String(d.draft_id)}
+                                                    role="tab"
+                                                    aria-selected={isActive}
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setActivePersona(
+                                                            d.persona,
+                                                        )
+                                                    }
+                                                    className={
+                                                        "flex-1 rounded px-3 py-1.5 text-xs font-medium transition-colors " +
+                                                        (isActive
+                                                            ? "bg-surface text-text shadow-sm"
+                                                            : "text-muted hover:text-text-2")
+                                                    }
+                                                >
+                                                    {PERSONA_TAB_LABEL[
+                                                        d.persona
+                                                    ] ?? d.persona}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
-                            </div>
+                            )}
                             <DraftCard
                                 key={String(current.draft_id)}
                                 draft={current}

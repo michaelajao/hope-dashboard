@@ -151,6 +151,100 @@ function picks0Module(users) {
 }
 
 /**
+ * Set of facilitator user ids, derived from FacilitatorComments.txt.
+ * Each `facilitatorComments[].userId` is the FACILITATOR who authored
+ * that reply (confirmed against the raw export — e.g. uid 6785, 1238).
+ * We use this to label authorship in forum threads: a DiscussionTopics
+ * reply whose `userId` is in this set is a facilitator post, otherwise
+ * a participant post. This is the authoritative signal (low-vs-high
+ * user-id heuristics are unreliable).
+ */
+function buildFacilitatorIdSet(fc) {
+    const ids = new Set();
+    for (const m of fc.modules ?? []) {
+        for (const ua of m.userActivities ?? []) {
+            for (const c of ua.facilitatorComments ?? []) {
+                if (c.userId != null) ids.add(c.userId);
+            }
+        }
+    }
+    return ids;
+}
+
+/**
+ * Reconstruct forum threads for a module from DiscussionTopics.txt.
+ *
+ * Forum topics are MODULE-level (shared by every cohort of the module),
+ * so replies come from many cohorts + facilitators. We:
+ *   - order each topic's replies chronologically,
+ *   - label each reply's author role (facilitator vs participant) via
+ *     the facilitator-id set,
+ *   - alias the author: the focal cohort's own members get their bundle
+ *     alias (P26 etc.); facilitators show as "Facilitator"; everyone
+ *     else (other cohorts) shows as "A participant" — never invent an
+ *     alias for a non-cohort author or we'd risk cross-cohort identity
+ *     leakage.
+ *
+ * Returns:
+ *   - eventsByUser: Map<uid, discussion_post event[]> for THIS cohort's
+ *     participants only (these become timeline events).
+ *   - threads: { [topicId]: { title, replies: [{alias, role, text,
+ *     recordedAt}] } } — only topics with >=1 reply from this cohort,
+ *     carrying the FULL ordered thread (all authors) for reply context.
+ */
+function extractModuleDiscussions(dt, moduleId, cohortUserIds, uidToAlias, facilitatorIds) {
+    const eventsByUser = new Map();
+    const threads = {};
+    const mod = (dt.modules ?? []).find((m) => m.id === moduleId);
+    if (!mod) return { eventsByUser, threads };
+
+    for (const topic of mod.topics ?? []) {
+        const replies = [...(topic.replies ?? [])]
+            .filter((r) => r.recorded && (r.comment ?? "").trim())
+            .sort((a, b) => String(a.recorded).localeCompare(String(b.recorded)));
+        if (replies.length === 0) continue;
+
+        let cohortAuthored = false;
+        const threadReplies = replies.map((r) => {
+            const isFacilitator = facilitatorIds.has(r.userId);
+            const isCohortMember = cohortUserIds.has(r.userId);
+            if (isCohortMember) cohortAuthored = true;
+            const alias = isFacilitator
+                ? "Facilitator"
+                : isCohortMember
+                  ? uidToAlias.get(r.userId)
+                  : "A participant";
+            const text = (r.comment ?? "").trim();
+            const recordedAt = normaliseTimestamp(r.recorded);
+
+            // Emit a timeline event for the focal cohort's own posts.
+            if (isCohortMember && !isFacilitator) {
+                if (!eventsByUser.has(r.userId)) eventsByUser.set(r.userId, []);
+                eventsByUser.get(r.userId).push({
+                    timestamp: recordedAt,
+                    event_type: "discussion_post",
+                    activity_type: "Discussion",
+                    topicId: topic.id,
+                    description: text,
+                    words_written: text.split(/\s+/).length,
+                });
+            }
+            return { alias, role: isFacilitator ? "facilitator" : "participant", text, recordedAt };
+        });
+
+        // Only keep threads this cohort actually participated in — keeps
+        // the bundle lean and avoids shipping unrelated topics.
+        if (cohortAuthored) {
+            threads[topic.id] = {
+                title: topic.pageTitle ?? `Topic ${topic.id}`,
+                replies: threadReplies,
+            };
+        }
+    }
+    return { eventsByUser, threads };
+}
+
+/**
  * All cohort learners, ranked by activity count (descending) so the
  * heaviest-engagement participants appear first in the bundle order.
  * The queue panel re-ranks by risk at render time; this ordering is
@@ -197,7 +291,7 @@ function eventFromActivity(a) {
 }
 
 
-function extractOne(ua, up, fc, profileBy, modulesInProfile, cohortId) {
+function extractOne(ua, up, fc, dt, facilitatorIds, profileBy, modulesInProfile, cohortId) {
     const meta = COHORT_REGISTRY[cohortId];
     const users = extractUsers(ua, cohortId);
     console.log(`\ncohort ${meta.code} (id=${cohortId}): ${users.length} learners`);
@@ -209,11 +303,26 @@ function extractOne(ua, up, fc, profileBy, modulesInProfile, cohortId) {
         );
     }
     const picks = pickRepresentative(users);
+    const moduleId = picks0Module(users);
 
     const facilitatorByUser = extractFacilitatorReplies(
         fc,
         picks.map((u) => u.userId),
     );
+
+    // Forum threads (module-level). uidToAlias maps this cohort's user
+    // ids to their bundle alias (P1..Pn in picks order) so thread views
+    // label the focal participant's own posts with their alias.
+    const uidToAlias = new Map(picks.map((u, i) => [u.userId, `P${i + 1}`]));
+    const cohortUserIds = new Set(picks.map((u) => u.userId));
+    const { eventsByUser: discussionEventsByUser, threads: discussionThreads } =
+        extractModuleDiscussions(
+            dt,
+            moduleId,
+            cohortUserIds,
+            uidToAlias,
+            facilitatorIds,
+        );
 
     const participants = picks.map((u, i) => {
         const profile = profileBy.get(u.userId);
@@ -259,24 +368,13 @@ function extractOne(ua, up, fc, profileBy, modulesInProfile, cohortId) {
             if (!ts) continue;
             events.push({ timestamp: normaliseTimestamp(ts), event_type: "bookmark" });
         }
-        // Discussion / forum posts. IIH cohorts (and the current JSON
-        // export shape) carry zero of these, so this loop is a no-op
-        // today — but the pipeline downstream (memory store + dashboard
-        // timeline) IS ready, so the moment a future export adds the
-        // field, forum content will flow through end-to-end without
-        // another change. Probe a few possible field names defensively.
-        for (const d of u.discussionPosts ?? u.posts ?? u.discussions ?? []) {
-            const ts = d.recorded ?? d.posted ?? d.timestamp;
-            if (!ts) continue;
-            const description = (d.description ?? d.text ?? d.body ?? "").trim();
-            if (!description) continue;
-            events.push({
-                timestamp: normaliseTimestamp(ts),
-                event_type: "discussion_post",
-                activity_type: "Discussion",
-                words_written: description.split(/\s+/).length,
-                description,
-            });
+        // Discussion / forum posts come from the module-level
+        // DiscussionTopics.txt (not the per-user activity record), so
+        // they're prepared up front in `discussionEventsByUser` and just
+        // attached here. Each carries its `topicId` so the dashboard can
+        // pull the full thread for context when drafting a reply.
+        for (const de of discussionEventsByUser.get(u.userId) ?? []) {
+            events.push(de);
         }
         for (const fc of facilitatorByUser.get(u.userId) ?? []) {
             if (!fc.recordedAt) continue;
@@ -316,6 +414,12 @@ function extractOne(ua, up, fc, profileBy, modulesInProfile, cohortId) {
             programmeLengthDays: meta.programmeLengthDays,
         },
         participants,
+        // Forum threads this cohort took part in, keyed by topic id.
+        // Each holds the full ordered back-and-forth (all authors,
+        // aliased) so the dashboard can show the thread + feed it to the
+        // model as reply context. Empty {} when the cohort has no forum
+        // activity.
+        discussionThreads,
     };
 
     const outputPath = path.join(OUTPUT_DIR, `${meta.bundleSlug}.json`);
@@ -332,6 +436,7 @@ function extractOne(ua, up, fc, profileBy, modulesInProfile, cohortId) {
     }
     console.log(`  totals: ${participants.length} participants`);
     console.log(`  events: ${Object.entries(totals).map(([k, v]) => `${k.slice(0, 4)}:${v}`).join(" ")}`);
+    console.log(`  forum threads: ${Object.keys(discussionThreads).length}`);
 }
 
 
@@ -342,14 +447,19 @@ function main() {
     const ua = loadJson("UserActivity (2).txt");
     const up = loadJson("UserProfile (1).txt");
     const fc = loadJson("FacilitatorComments.txt");
+    // Module-level forum threads. discussions.csv is derived from this
+    // same file; we read the JSON directly to keep one source of truth.
+    const dt = loadJson("DiscussionTopics.txt");
 
     const profileBy = buildProfileLookup(up);
     const modulesInProfile = new Set();
     for (const m of up.modules ?? []) modulesInProfile.add(m.id);
+    const facilitatorIds = buildFacilitatorIdSet(fc);
+    console.log(`facilitator ids: ${facilitatorIds.size}`);
 
     const cohortIds = parseCohortIds();
     for (const cid of cohortIds) {
-        extractOne(ua, up, fc, profileBy, modulesInProfile, cid);
+        extractOne(ua, up, fc, dt, facilitatorIds, profileBy, modulesInProfile, cid);
     }
 }
 

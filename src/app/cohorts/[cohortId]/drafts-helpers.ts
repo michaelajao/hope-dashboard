@@ -57,12 +57,13 @@ const FAMILY_DISPLAY_OVERRIDES: Record<string, string> = {
  * noise in the UI.
  *
  *  - Hub ids (``namespace/repo``) drop the namespace, the ``-lora``
- *    suffix, and the ``-hope-only`` segment:
- *    ``michaelajao/qwen3-1.7b-hope-only-lora`` → ``Qwen3 1.7B``;
- *    ``michaelajao/qwen3-4b-hope-only-v5-lora`` → ``Qwen3 4B v5``.
+ *    suffix, the ``-hope-only`` segment, AND training-version tokens
+ *    like ``-v5``: ``michaelajao/qwen3-1.7b-hope-only-lora`` →
+ *    ``Qwen3 1.7B``; ``michaelajao/qwen3-4b-hope-only-v5-lora`` →
+ *    ``Qwen3 4B``. The version is an internal training-iteration tag,
+ *    not something a facilitator needs to see.
  *  - Tokens that look like a size (``1.7b``, ``4b``) get an upper-case
- *    ``B``. Version tokens (``v5``) stay lower-case. Other alphabetic
- *    tokens are title-cased.
+ *    ``B``. Other alphabetic tokens are title-cased.
  *  - Non-SLM versions (the kill-switch / safety / fallback strings) get
  *    their friendly mapping from MODEL_VERSION_FALLBACKS.
  */
@@ -75,7 +76,10 @@ export function formatModelLabel(modelVersion: string): string {
         : modelVersion;
     const stripped = afterSlash
         .replace(/-lora$/, "")
-        .replace(/-hope-only/g, "");
+        .replace(/-hope-only/g, "")
+        // Drop training-iteration version tokens (e.g. "-v5"). Internal
+        // tag; not facilitator-facing.
+        .replace(/-v\d+/g, "");
     return stripped
         .split("-")
         .filter(Boolean)
@@ -90,8 +94,6 @@ export function formatModelLabel(modelVersion: string): string {
             if (/^\d/.test(part) && part.endsWith("b")) {
                 return part.slice(0, -1) + "B";
             }
-            // Version tokens like "v5" stay lowercase.
-            if (/^v\d+$/i.test(part)) return part.toLowerCase();
             // Family / other alphabetic tokens — title-case.
             if (/^[a-z]/.test(part)) {
                 return part[0].toUpperCase() + part.slice(1);

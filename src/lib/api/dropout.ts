@@ -40,6 +40,10 @@ export type EventRecord = {
     activity_type?: string;
     words_written?: number;
     description?: string;
+    /** Forum topic id for `discussion_post` events — links to the
+     * cohort bundle's `discussionThreads[topicId]` so the dashboard can
+     * show the thread and pass it as reply context. */
+    topic_id?: number;
 };
 
 /**

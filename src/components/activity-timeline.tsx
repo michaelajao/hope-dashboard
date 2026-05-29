@@ -254,8 +254,13 @@ export function ActivityTimeline({
                         const isEmotions =
                             r.event.event_type === "activity" &&
                             r.event.activity_type === "Emotions";
+                        // Both structured activities and forum/discussion
+                        // posts are draftable reply targets. Forum posts
+                        // open the single-reply flow; activities open the
+                        // persona flow (handled in drafts.tsx).
                         const isPost =
-                            r.event.event_type === "activity" &&
+                            (r.event.event_type === "activity" ||
+                                r.event.event_type === "discussion_post") &&
                             typeof r.event.description === "string" &&
                             r.event.description.trim().length > 0 &&
                             !isEmotions;
