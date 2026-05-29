@@ -24,11 +24,14 @@ const THIRTY_SECONDS = 30 * 1000;
  * needing a hard-reload. The server-side loader is mtime-aware (see
  * `cohort-data.ts`) so the new bundle is read immediately on next fetch.
  */
-export function useCohortBundle() {
+export function useCohortBundle(cohortId?: number) {
     return useQuery({
-        queryKey: ["cohort-bundle"],
+        queryKey: ["cohort-bundle", cohortId ?? "default"],
         queryFn: async (): Promise<CohortBundle | null> => {
-            const res = await fetch("/api/cohort-bundle");
+            const url = cohortId
+                ? `/api/cohort-bundle?cohortId=${cohortId}`
+                : "/api/cohort-bundle";
+            const res = await fetch(url);
             if (res.status === 204) return null;
             if (!res.ok) {
                 throw new Error(

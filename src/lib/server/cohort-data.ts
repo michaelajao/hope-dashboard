@@ -24,11 +24,22 @@ if (typeof window !== "undefined") {
     );
 }
 
-const BUNDLE_PATH = path.join(
-    process.cwd(),
-    "local",
-    "iih-coh12-110226.json",
-);
+// Per-cohort bundle slugs. Match the `bundleSlug` field in
+// scripts/extract-iih-cohort.mjs's COHORT_REGISTRY so the loader and
+// extractor stay in sync. Adding a new cohort means adding a row here
+// AND in src/lib/cohorts.ts; both lookups are id-keyed for an O(1)
+// resolve at request time.
+const BUNDLE_SLUG_BY_COHORT_ID: Record<number, string> = {
+    1600: "iih-coh10-190325",
+    1651: "iih-coh11-170925",
+    1680: "iih-coh12-110226",
+};
+
+function bundlePathFor(cohortId: number): string | null {
+    const slug = BUNDLE_SLUG_BY_COHORT_ID[cohortId];
+    if (!slug) return null;
+    return path.join(process.cwd(), "local", `${slug}.json`);
+}
 
 export type RealEvent = {
     timestamp: string;
@@ -72,34 +83,42 @@ export type CohortBundle = {
     participants: RealParticipant[];
 };
 
-let _cache: CohortBundle | null | undefined = undefined;
-let _cacheMtimeMs: number | null = null;
+type CacheEntry = { bundle: CohortBundle | null; mtimeMs: number | null };
+const _cache: Map<number, CacheEntry> = new Map();
 
 /**
- * Loads the bundle, invalidating the in-memory cache when the file on
- * disk has changed. Mtime-based invalidation is important during dev:
- * when the extraction script is re-run, we want the next dashboard
- * request to pick up the new data without a Next.js restart.
+ * Loads the bundle for a given cohort, invalidating the in-memory cache
+ * when the file on disk has changed. Mtime-based invalidation is
+ * important during dev: when the extraction script is re-run, the next
+ * dashboard request picks up the new data without a Next.js restart.
+ *
+ * Returns `null` when the cohort has no bundle slug or the file isn't
+ * on disk yet — the API route surfaces this as a 204 and the queue
+ * renders its empty state.
  */
-export function loadCohortBundle(): CohortBundle | null {
+export function loadCohortBundle(cohortId: number): CohortBundle | null {
+    const bundlePath = bundlePathFor(cohortId);
+    if (!bundlePath) return null;
     try {
-        if (!fs.existsSync(BUNDLE_PATH)) {
-            _cache = null;
-            _cacheMtimeMs = null;
+        if (!fs.existsSync(bundlePath)) {
+            _cache.set(cohortId, { bundle: null, mtimeMs: null });
             return null;
         }
-        const mtimeMs = fs.statSync(BUNDLE_PATH).mtimeMs;
-        if (_cache !== undefined && _cacheMtimeMs === mtimeMs) {
-            return _cache;
+        const mtimeMs = fs.statSync(bundlePath).mtimeMs;
+        const cached = _cache.get(cohortId);
+        if (cached && cached.mtimeMs === mtimeMs) {
+            return cached.bundle;
         }
-        const raw = fs.readFileSync(BUNDLE_PATH, "utf8");
-        _cache = JSON.parse(raw) as CohortBundle;
-        _cacheMtimeMs = mtimeMs;
-        return _cache;
+        const raw = fs.readFileSync(bundlePath, "utf8");
+        const bundle = JSON.parse(raw) as CohortBundle;
+        _cache.set(cohortId, { bundle, mtimeMs });
+        return bundle;
     } catch (err) {
-        console.warn("[cohort-data] failed to load bundle:", err);
-        _cache = null;
-        _cacheMtimeMs = null;
+        console.warn(
+            `[cohort-data] failed to load bundle for cohort ${cohortId}:`,
+            err,
+        );
+        _cache.set(cohortId, { bundle: null, mtimeMs: null });
         return null;
     }
 }

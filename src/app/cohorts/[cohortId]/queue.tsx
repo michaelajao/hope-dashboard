@@ -37,7 +37,7 @@ function useMountTime(): number {
 }
 
 export function Queue({ cohort }: { cohort: CohortMeta }) {
-    const bundle = useCohortBundle();
+    const bundle = useCohortBundle(cohort.id);
     const scoreAtWeek = useScoringStore((s) => s.scoreAtWeek);
     const scoreAt = scoreAtDayForWeek(scoreAtWeek);
     const histories: ParticipantHistory[] = useMemo(() => {

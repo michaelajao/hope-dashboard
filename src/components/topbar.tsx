@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { useCohortBatch } from "@/lib/hooks/api";
 import { useCohortBundle } from "@/lib/hooks/useCohortBundle";
+import { ModelPicker } from "@/components/model-picker";
 import { bundleParticipantIds, bundleToHistory } from "@/lib/realCohort";
 import {
     scoreAtDay as scoreAtDayForWeek,
@@ -19,7 +20,7 @@ type TopbarProps = {
 };
 
 export function Topbar({ cohort }: TopbarProps) {
-    const bundle = useCohortBundle();
+    const bundle = useCohortBundle(cohort.id);
     const scoreAtWeek = useScoringStore((s) => s.scoreAtWeek);
     const scoreAt = scoreAtDayForWeek(scoreAtWeek);
     const histories = useMemo<ParticipantHistory[]>(() => {
@@ -75,6 +76,7 @@ export function Topbar({ cohort }: TopbarProps) {
                 </nav>
             </div>
             <div className="flex flex-wrap items-center gap-2 lg:ml-auto">
+                <ModelPicker />
                 <StatPill value={needsFollowUp} label="need follow-up" />
                 <StatPill value={high} label="high priority" />
                 <StatPill value={sentThisSession} label="contacted this session" />

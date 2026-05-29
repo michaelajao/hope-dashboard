@@ -23,16 +23,47 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
 const RAW_ROOT = path.resolve(REPO_ROOT, "..", "comment_generation", "data");
 
-const TARGET_COHORT_ID = 1680;
-const TARGET_COHORT_NAME = "IIH-COH12-110226";
-const COHORT_EFFECTIVE_START = "2026-02-11T00:00:00Z"; // earliest learner started
-// IIH 2025 is a 6-week programme. Other cohorts will override this when
-// they're added — keep the value explicit so it's never confused with a
-// derived/default value at the dashboard side.
-const COHORT_PROGRAMME_LENGTH_DAYS = 42;
+// Per-cohort metadata for the IIH course (module 337). Every cohort in
+// this table is bundle-extractable from `UserActivity (2).txt`. Add a
+// new cohort by appending here and the dashboard's cohort index will
+// pick it up automatically.
+const COHORT_REGISTRY = {
+    1600: {
+        code: "IIH-COH10-190325",
+        effectiveStart: "2025-03-19T00:00:00Z",
+        programmeLengthDays: 42,
+        bundleSlug: "iih-coh10-190325",
+    },
+    1651: {
+        code: "IIH-COH11-170925",
+        effectiveStart: "2025-09-17T00:00:00Z",
+        programmeLengthDays: 42,
+        bundleSlug: "iih-coh11-170925",
+    },
+    1680: {
+        code: "IIH-COH12-110226",
+        effectiveStart: "2026-02-11T00:00:00Z",
+        programmeLengthDays: 42,
+        bundleSlug: "iih-coh12-110226",
+    },
+};
+
+// CLI: `node scripts/extract-iih-cohort.mjs [cohortId|all]`. Default is
+// COH12 (the demo cohort we ship in-tree). Pass `all` to extract every
+// cohort in COHORT_REGISTRY in one pass.
+function parseCohortIds() {
+    const arg = (process.argv[2] || "1680").toString();
+    if (arg === "all") return Object.keys(COHORT_REGISTRY).map(Number);
+    const id = Number(arg);
+    if (!COHORT_REGISTRY[id]) {
+        throw new Error(
+            `Unknown cohort ${arg}; known: ${Object.keys(COHORT_REGISTRY).join(", ")}, or 'all'.`,
+        );
+    }
+    return [id];
+}
 
 const OUTPUT_DIR = path.join(REPO_ROOT, "local");
-const OUTPUT_PATH = path.join(OUTPUT_DIR, "iih-coh12-110226.json");
 
 function loadJson(name) {
     const p = path.join(RAW_ROOT, name);
@@ -43,10 +74,10 @@ function loadJson(name) {
     return JSON.parse(fs.readFileSync(p, "utf8"));
 }
 
-function findIihCohort(doc) {
+function findCohort(doc, targetCohortId) {
     for (const m of doc.modules ?? []) {
         for (const c of m.cohorts ?? []) {
-            if (c.id === TARGET_COHORT_ID) {
+            if (c.id === targetCohortId) {
                 return { module: m, cohort: c };
             }
         }
@@ -54,10 +85,10 @@ function findIihCohort(doc) {
     return null;
 }
 
-function extractUsers(ua) {
-    const hit = findIihCohort(ua);
+function extractUsers(ua, targetCohortId) {
+    const hit = findCohort(ua, targetCohortId);
     if (!hit) {
-        throw new Error(`Cohort ${TARGET_COHORT_ID} not found in UserActivity`);
+        throw new Error(`Cohort ${targetCohortId} not found in UserActivity`);
     }
     const { module, cohort } = hit;
     return (cohort.users ?? []).map((u) => ({
@@ -166,29 +197,18 @@ function eventFromActivity(a) {
 }
 
 
-function main() {
-    // "UserActivity (2).txt" is the May 26 2026 export — the first one
-    // that includes module 337 (IIH 2025) where cohort 1680 lives. The older
-    // "UserActivity (1).txt" stops at module 332 and excludes this cohort.
-    const ua = loadJson("UserActivity (2).txt");
-    const up = loadJson("UserProfile (1).txt");
-    const fc = loadJson("FacilitatorComments.txt");
+function extractOne(ua, up, fc, profileBy, modulesInProfile, cohortId) {
+    const meta = COHORT_REGISTRY[cohortId];
+    const users = extractUsers(ua, cohortId);
+    console.log(`\ncohort ${meta.code} (id=${cohortId}): ${users.length} learners`);
 
-    const users = extractUsers(ua);
-    console.log(`cohort ${TARGET_COHORT_NAME}: ${users.length} learners`);
-
-    const profileBy = buildProfileLookup(up);
-    const modulesInProfile = new Set();
-    for (const m of up.modules ?? []) modulesInProfile.add(m.id);
     if (!modulesInProfile.has(picks0Module(users))) {
         console.warn(
             `⚠  UserProfile (1).txt does not include module ${picks0Module(users)} — ` +
-            `bios will fall back to a generic placeholder. Modules covered: ` +
-            `${[...modulesInProfile].sort((a, b) => a - b).join(", ")}`,
+            `bios will fall back to a generic placeholder.`,
         );
     }
     const picks = pickRepresentative(users);
-    console.log(`picked ${picks.length} representative learners`);
 
     const facilitatorByUser = extractFacilitatorReplies(
         fc,
@@ -229,7 +249,13 @@ function main() {
             events.push({ timestamp: normaliseTimestamp(ts), event_type: "page_visit" });
         }
         for (const b of u.bookmarks ?? []) {
-            const ts = b.recorded ?? b.timestamp;
+            // Platform schema stores the bookmark timestamp under
+            // `bookmarked` (not `recorded`). The earlier `b.recorded ?? b.timestamp`
+            // probe always missed and silently dropped every bookmark —
+            // the IIH cohort lost 245 bookmark events that way. Probe
+            // the canonical field first, keep the legacy fallbacks for
+            // safety in case the export shape ever changes.
+            const ts = b.bookmarked ?? b.recorded ?? b.timestamp;
             if (!ts) continue;
             events.push({ timestamp: normaliseTimestamp(ts), event_type: "bookmark" });
         }
@@ -248,10 +274,10 @@ function main() {
             displayName: `P${i + 1}`,
             bio: shortBio(
                 profile,
-                "Joined the IIH 2025 cohort. No profile bio submitted yet.",
+                `Joined ${meta.code}. No profile bio submitted yet.`,
             ),
             firstName: profile?.firstName ?? null,
-            startedAt: normaliseTimestamp(u.started ?? COHORT_EFFECTIVE_START),
+            startedAt: normaliseTimestamp(u.started ?? meta.effectiveStart),
             finishedAt: u.finished ? normaliseTimestamp(u.finished) : null,
             events,
             priorFacilitatorReplies: facilitatorByUser.get(u.userId) ?? [],
@@ -263,37 +289,48 @@ function main() {
 
     const out = {
         cohort: {
-            id: TARGET_COHORT_ID,
-            code: TARGET_COHORT_NAME,
+            id: cohortId,
+            code: meta.code,
             moduleId: picks[0].moduleId,
             moduleName: picks[0].moduleName,
-            effectiveStart: COHORT_EFFECTIVE_START,
-            programmeLengthDays: COHORT_PROGRAMME_LENGTH_DAYS,
+            effectiveStart: meta.effectiveStart,
+            programmeLengthDays: meta.programmeLengthDays,
         },
         participants,
     };
 
+    const outputPath = path.join(OUTPUT_DIR, `${meta.bundleSlug}.json`);
     fs.mkdirSync(OUTPUT_DIR, { recursive: true });
-    fs.writeFileSync(OUTPUT_PATH, JSON.stringify(out, null, 2));
-    const sizeKb = (fs.statSync(OUTPUT_PATH).size / 1024).toFixed(1);
-    console.log(`wrote ${OUTPUT_PATH} (${sizeKb} KB)`);
+    fs.writeFileSync(outputPath, JSON.stringify(out, null, 2));
+    const sizeKb = (fs.statSync(outputPath).size / 1024).toFixed(1);
+    console.log(`wrote ${outputPath} (${sizeKb} KB)`);
 
-    // Summary: top-10 most engaged + cohort-level event totals. 51 rows
-    // would be noisy; what we care about is "does the bundle look right".
     const totals = { activity: 0, login: 0, page_visit: 0, facilitator_comment: 0, bookmark: 0, discussion_post: 0 };
     for (const p of participants) {
         for (const e of p.events) {
             totals[e.event_type] = (totals[e.event_type] ?? 0) + 1;
         }
     }
-    console.log(`cohort totals: ${participants.length} participants`);
+    console.log(`  totals: ${participants.length} participants`);
     console.log(`  events: ${Object.entries(totals).map(([k, v]) => `${k.slice(0, 4)}:${v}`).join(" ")}`);
-    console.log("top 10 by activity count:");
-    for (const p of participants.slice(0, 10)) {
-        const hasBio = p.bio.startsWith("Joined the IIH") ? "—" : "bio";
-        console.log(
-            `  ${p.displayName.padEnd(4)} uid=${p.participant_id}  events=${String(p.events.length).padStart(4)}  ${hasBio}`,
-        );
+}
+
+
+function main() {
+    // "UserActivity (2).txt" is the May 26 2026 export — the first one
+    // that includes module 337 (IIH 2025) where the IIH cohorts live. The
+    // older "UserActivity (1).txt" stops at module 332.
+    const ua = loadJson("UserActivity (2).txt");
+    const up = loadJson("UserProfile (1).txt");
+    const fc = loadJson("FacilitatorComments.txt");
+
+    const profileBy = buildProfileLookup(up);
+    const modulesInProfile = new Set();
+    for (const m of up.modules ?? []) modulesInProfile.add(m.id);
+
+    const cohortIds = parseCohortIds();
+    for (const cid of cohortIds) {
+        extractOne(ua, up, fc, profileBy, modulesInProfile, cid);
     }
 }
 

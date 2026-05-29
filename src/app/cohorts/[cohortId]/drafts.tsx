@@ -65,7 +65,7 @@ import {
 
 export function Drafts({ cohort }: { cohort: CohortMeta }) {
     const selectedId = useUiStore((s) => s.selectedParticipantId);
-    const bundle = useCohortBundle();
+    const bundle = useCohortBundle(cohort.id);
     const scoreAtWeek = useScoringStore((s) => s.scoreAtWeek);
     const scoreAt = scoreAtDayForWeek(scoreAtWeek);
     const history = useMemo(() => {
@@ -404,7 +404,7 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                                             <button
                                                 key={String(d.draft_id)}
                                                 role="tab"
-                                                aria-selected={isActive}
+                                                aria-selected={isActive ? "true" : "false"}
                                                 type="button"
                                                 onClick={() =>
                                                     setActivePersona(d.persona)

@@ -52,6 +52,8 @@ dev-server.log
 # now ships the bundle in-tree so the dashboard is self-contained on any
 # host. Other ad-hoc files dropped into `local/` are still ignored.
 local/*
+!local/iih-coh10-190325.json
+!local/iih-coh11-170925.json
 !local/iih-coh12-110226.json
 
 # Ad-hoc Playwright screenshots and scratch

@@ -40,7 +40,7 @@ export function Detail({
     const select = useUiStore((s) => s.selectParticipant);
     const snooze = useQueueStore((s) => s.snooze);
     const dismiss = useQueueStore((s) => s.dismiss);
-    const bundle = useCohortBundle();
+    const bundle = useCohortBundle(cohortId);
     const scoreAtWeek = useScoringStore((s) => s.scoreAtWeek);
     const scoreAt = scoreAtDayForWeek(scoreAtWeek);
     const history = useMemo(() => {

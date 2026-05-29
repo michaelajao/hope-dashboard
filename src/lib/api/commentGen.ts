@@ -30,6 +30,14 @@ export type MemoryWriteResponse = Schemas["MemoryWriteResponse"];
 export type HealthResponse = Schemas["HealthResponse"];
 export type VersionResponse = Schemas["VersionResponse"];
 
+// Admin: model picker — not in the generated OpenAPI yet (we added the
+// routes after `gen:types` was last run). Re-run `npm run gen:types`
+// once the comment-gen Space rebuilds and these inline types can be
+// removed in favour of the generated ones.
+export type ModelOption = { model_id: string; label: string };
+export type ModelsResponse = { current: string; options: ModelOption[] };
+export type SwitchModelResponse = { current: string; previous: string };
+
 export function createCommentGenClient(
     opts: Partial<ApiClientOptions> = {},
 ) {
@@ -97,6 +105,17 @@ export function createCommentGenClient(
             request<MemoryEntry[]>({
                 path: `/memory/${participantId}`,
                 query: { cohort_id: cohortId, limit },
+                signed: true,
+            }),
+
+        listModels: () =>
+            request<ModelsResponse>({ path: "/admin/models" }),
+
+        switchModel: (modelId: string) =>
+            request<SwitchModelResponse>({
+                method: "POST",
+                path: "/admin/model",
+                body: { model_id: modelId },
                 signed: true,
             }),
     };

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo } from "react";
 
+import { RiskModelChip } from "@/components/risk-model-chip";
 import {
     availableWeeks,
     MODEL_MAX_HORIZON_DAYS,
@@ -91,6 +92,7 @@ export function WeekSelector({
                     : `day ${week * 7}`}
                 {cappedByModel ? " · model capped at W6" : ""})
             </span>
+            <RiskModelChip />
         </div>
     );
 }

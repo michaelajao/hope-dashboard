@@ -27,6 +27,25 @@ export type CohortMeta = {
 };
 
 export const COHORTS: CohortMeta[] = [
+    // Ordered chronologically. IIH-COH10 (1600) is in the dropout
+    // model's training set; COH11 (1651) and COH12 (1680) are temporal
+    // test (TEMPORAL_CUTOFF = 2025-09-01 in engagement_ml). All three
+    // are facilitator-led, all have draftable activity descriptions and
+    // facilitator-reply history extracted from the platform export.
+    {
+        id: 1600,
+        code: "IIH-COH10-190325",
+        moduleId: 337,
+        moduleName: "People living with IIH 2025 — V1",
+        programmeLengthDays: 42,
+    },
+    {
+        id: 1651,
+        code: "IIH-COH11-170925",
+        moduleId: 337,
+        moduleName: "People living with IIH 2025 — V1",
+        programmeLengthDays: 42,
+    },
     {
         id: 1680,
         code: "IIH-COH12-110226",

@@ -12,11 +12,14 @@ import type {
     GenerateRequest,
     GenerateResponse,
     MemoryEntry,
+    ModelsResponse,
+    SwitchModelResponse,
     ThumbRequest,
 } from "@/lib/api/commentGen";
 import type {
     BatchEventRequest,
     BatchResponse,
+    ModelInfo,
     ParticipantHistory,
     PredictionResponse,
 } from "@/lib/api/dropout";
@@ -132,6 +135,54 @@ export function useEvent() {
             if (variables.action === "accept" || variables.action === "edit") {
                 useSessionStatsStore.getState().incrementSent();
             }
+        },
+    });
+}
+
+export function useRiskModelInfo() {
+    return useQuery({
+        queryKey: ["risk-model-info"],
+        queryFn: async (): Promise<ModelInfo> => {
+            const res = await fetch("/api/proxy/dropout/model-info");
+            if (!res.ok) {
+                throw new Error(`dropout/model-info failed: ${res.status}`);
+            }
+            return res.json();
+        },
+        staleTime: ONE_DAY,
+        refetchOnWindowFocus: false,
+    });
+}
+
+export function useCommentGenModels() {
+    return useQuery({
+        queryKey: ["comment-gen-models"],
+        queryFn: async (): Promise<ModelsResponse> => {
+            const res = await fetch("/api/proxy/admin/models");
+            if (!res.ok) {
+                throw new Error(`admin/models failed: ${res.status}`);
+            }
+            return res.json();
+        },
+        staleTime: FIVE_MIN,
+        refetchOnWindowFocus: false,
+    });
+}
+
+export function useSwitchCommentGenModel() {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (modelId: string) =>
+            postJSON<SwitchModelResponse>("/api/proxy/admin/model", {
+                model_id: modelId,
+            }),
+        onSuccess: (data) => {
+            // Reflect the new current id in the dropdown without a refetch.
+            qc.setQueryData<ModelsResponse>(
+                ["comment-gen-models"],
+                (prev) =>
+                    prev ? { ...prev, current: data.current } : prev,
+            );
         },
     });
 }
