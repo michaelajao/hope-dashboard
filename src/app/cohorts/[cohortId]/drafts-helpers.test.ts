@@ -26,6 +26,20 @@ describe("formatModelLabel", () => {
         );
     });
 
+    it("handles Llama 3.2 3B Instruct with decimal version + instruct suffix", () => {
+        expect(
+            formatModelLabel(
+                "michaelajao/llama-3.2-3b-instruct-hope-only-lora",
+            ),
+        ).toBe("Llama 3.2 3B Instruct");
+    });
+
+    it("preserves SmolLM canonical capitalisation via family override", () => {
+        expect(
+            formatModelLabel("michaelajao/smollm3-3b-hope-only-lora"),
+        ).toBe("SmolLM3 3B");
+    });
+
     it("maps stub-disabled to a friendly label", () => {
         expect(formatModelLabel("stub-disabled")).toBe("stub (kill-switch)");
     });

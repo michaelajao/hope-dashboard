@@ -32,6 +32,22 @@ export const MODEL_VERSION_FALLBACKS: Record<string, string> = {
 };
 
 /**
+ * Family-name overrides for token-by-token title-casing. Default
+ * behaviour ("smollm3" -> "Smollm3") loses the canonical internal
+ * capitalisation; this map preserves the publisher-preferred form.
+ * Keys are lower-cased; values are exact replacements applied as the
+ * first token of a stripped model id.
+ */
+const FAMILY_DISPLAY_OVERRIDES: Record<string, string> = {
+    smollm: "SmolLM",
+    smollm2: "SmolLM2",
+    smollm3: "SmolLM3",
+    smollm4: "SmolLM4",
+    minicpm: "MiniCPM",
+    tinyllama: "TinyLlama",
+};
+
+/**
  * Render the badge label for a draft response's ``model_version`` field.
  *
  * Goal: surface the base model identity to the facilitator, not the
@@ -63,7 +79,13 @@ export function formatModelLabel(modelVersion: string): string {
     return stripped
         .split("-")
         .filter(Boolean)
-        .map((part) => {
+        .map((part, idx) => {
+            // First-token family-name override preserves canonical
+            // internal capitalisation that title-casing would lose
+            // (e.g. "smollm3" -> "SmolLM3" not "Smollm3").
+            if (idx === 0 && FAMILY_DISPLAY_OVERRIDES[part]) {
+                return FAMILY_DISPLAY_OVERRIDES[part];
+            }
             // Size tokens like "1.7b", "4b", "0.6b" → upper-case the B.
             if (/^\d/.test(part) && part.endsWith("b")) {
                 return part.slice(0, -1) + "B";
