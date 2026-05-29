@@ -1,6 +1,8 @@
+"use client";
+
 import { cn } from "@/lib/utils";
 import { seedHash } from "@/lib/demo-events";
-import { displayName } from "@/lib/signals";
+import { useBundleDisplayName } from "@/lib/hooks/displayName";
 
 const PALETTE = [
     "bg-rose-100 text-rose-700",
@@ -21,12 +23,24 @@ const SIZE = {
 
 export type AvatarProps = {
     participantId: string;
+    cohortId?: number;
     size?: keyof typeof SIZE;
     className?: string;
 };
 
-export function Avatar({ participantId, size = "md", className }: AvatarProps) {
-    const initials = displayName(participantId).slice(0, 2).toUpperCase();
+export function Avatar({
+    participantId,
+    cohortId,
+    size = "md",
+    className,
+}: AvatarProps) {
+    // Use the bundle's display name (e.g. "P26") for the initials, not
+    // the raw user id digits. Before this, every avatar in cohort 1680
+    // showed "P1" because the first two chars of "P100xxx" are always
+    // P-then-1, which made the column visually undistinguishable.
+    const initials = useBundleDisplayName(participantId, cohortId)
+        .slice(0, 3)
+        .toUpperCase();
     const color = PALETTE[seedHash(participantId) % PALETTE.length];
     return (
         <span

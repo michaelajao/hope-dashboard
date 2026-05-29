@@ -150,6 +150,12 @@ export function activationLevel(
  * lookup once the platform feed lands.
  */
 export function displayName(participantId: string): string {
+    // Fallback when the cohort bundle isn't available. Inside React
+    // components prefer `useBundleDisplayName(participantId)` from
+    // `@/lib/hooks/displayName` — that returns the bundle's
+    // sequential alias (e.g. "P26") which is the canonical short
+    // label across the dashboard. This helper is only for non-React
+    // call sites or rendering before the bundle has loaded.
     const m = participantId.match(/(\d+)$/);
     if (m) return `P${parseInt(m[1], 10)}`;
     return participantId;

@@ -259,6 +259,25 @@ function extractOne(ua, up, fc, profileBy, modulesInProfile, cohortId) {
             if (!ts) continue;
             events.push({ timestamp: normaliseTimestamp(ts), event_type: "bookmark" });
         }
+        // Discussion / forum posts. IIH cohorts (and the current JSON
+        // export shape) carry zero of these, so this loop is a no-op
+        // today — but the pipeline downstream (memory store + dashboard
+        // timeline) IS ready, so the moment a future export adds the
+        // field, forum content will flow through end-to-end without
+        // another change. Probe a few possible field names defensively.
+        for (const d of u.discussionPosts ?? u.posts ?? u.discussions ?? []) {
+            const ts = d.recorded ?? d.posted ?? d.timestamp;
+            if (!ts) continue;
+            const description = (d.description ?? d.text ?? d.body ?? "").trim();
+            if (!description) continue;
+            events.push({
+                timestamp: normaliseTimestamp(ts),
+                event_type: "discussion_post",
+                activity_type: "Discussion",
+                words_written: description.split(/\s+/).length,
+                description,
+            });
+        }
         for (const fc of facilitatorByUser.get(u.userId) ?? []) {
             if (!fc.recordedAt) continue;
             events.push({

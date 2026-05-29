@@ -53,15 +53,29 @@ export type SeededReply = {
     source: "json_reconcile";
 };
 
-const ACTIVITY_TYPE_SET: ReadonlySet<ActivityType> = new Set<ActivityType>([
+// The activity_type union on the dashboard side is intentionally kept
+// narrow (GoalSetting / Gratitude / MyHOPE) per the 2026-05-29 scoping
+// decision, but the memory seeder ALSO needs to recognise "Discussion"
+// when reading bundle events so forum posts can be sent to the
+// server-side memory store. The server's ActivityType enum has
+// "Discussion" too; the dashboard never sends it as an /generate
+// activity_type, only as a memory-seed activity_type.
+const SEED_ACTIVITY_TYPES: ReadonlySet<string> = new Set<string>([
     "GoalSetting",
     "Gratitude",
     "MyHOPE",
+    "Discussion",
 ]);
 
 function asActivityType(raw: string | undefined): ActivityType {
-    if (raw && ACTIVITY_TYPE_SET.has(raw as ActivityType)) {
-        return raw as ActivityType;
+    if (raw && SEED_ACTIVITY_TYPES.has(raw)) {
+        // The Discussion case widens past the dashboard-side
+        // ActivityType union — we cast through `unknown` so the seed
+        // request can carry it to the server, where the enum DOES
+        // accept "Discussion". The server-side memory store indexes it
+        // and downstream retrieve merges it alongside activity posts;
+        // see drafts.py Discussion-merge logic.
+        return raw as unknown as ActivityType;
     }
     return "MyHOPE";
 }
@@ -110,21 +124,37 @@ export function buildSeedPostsFromBundle(
     );
     const out: SeededPost[] = [];
     let i = 0;
+    let j = 0;
     for (const e of participant.events) {
-        if (e.event_type !== "activity") continue;
+        // Activities (Gratitude/GoalSetting/MyHOPE) AND discussion-forum
+        // posts both seed the memory store. Activities are tagged with
+        // their own activity_type; discussion posts get
+        // activity_type="Discussion" so the server-side retrieve's hard
+        // filter keeps them from leaking into Gratitude/GoalSetting
+        // generations but lets them surface as additional context via
+        // drafts.py's Discussion-merge step.
+        const isActivity = e.event_type === "activity";
+        const isDiscussion = e.event_type === "discussion_post";
+        if (!isActivity && !isDiscussion) continue;
         const text = (e.description ?? "").trim();
         if (!text) continue;
+        // Separate id namespaces so activity and discussion seeds never
+        // collide on the dedupe key the memory store uses (activity_id).
+        const activityId = isDiscussion
+            ? pidNum * 1_000_000 + 500_000 + j++
+            : pidNum * 1_000_000 + i++;
         out.push({
-            activity_id: pidNum * 1_000_000 + i,
+            activity_id: activityId,
             participant_id: pidNum,
             cohort_id: cohortId,
             module_id: moduleId,
-            activity_type: asActivityType(e.activity_type),
+            activity_type: asActivityType(
+                isDiscussion ? "Discussion" : e.activity_type,
+            ),
             text: truncate(text),
             recorded_at: e.timestamp,
             source: "json_reconcile",
         });
-        i += 1;
     }
     return out;
 }

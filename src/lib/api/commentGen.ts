@@ -38,6 +38,25 @@ export type ModelOption = { model_id: string; label: string };
 export type ModelsResponse = { current: string; options: ModelOption[] };
 export type SwitchModelResponse = { current: string; previous: string };
 
+// Text tasks. /text/polish is the facilitator-input grammar+rephrase
+// surface wired to the "Polish with AI" button on the draft card.
+// `rephrase` is the default — it fixes spelling/grammar then rephrases
+// for clarity while preserving the warmth. The other tones exist for
+// future UI exposure (kebab menu) but the button currently calls
+// rephrase only.
+export type PolishTarget = "rephrase" | "warmer" | "shorter" | "clearer";
+export type PolishRequest = {
+    draft_text: string;
+    participant_id: number;
+    target_tone?: PolishTarget;
+};
+export type TextGenResponse = {
+    text: string;
+    task: string;
+    model_version: string;
+    generated_at: string;
+};
+
 export function createCommentGenClient(
     opts: Partial<ApiClientOptions> = {},
 ) {
@@ -105,6 +124,14 @@ export function createCommentGenClient(
             request<MemoryEntry[]>({
                 path: `/memory/${participantId}`,
                 query: { cohort_id: cohortId, limit },
+                signed: true,
+            }),
+
+        polishText: (body: PolishRequest) =>
+            request<TextGenResponse>({
+                method: "POST",
+                path: "/text/polish",
+                body,
                 signed: true,
             }),
 

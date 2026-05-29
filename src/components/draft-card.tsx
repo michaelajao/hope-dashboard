@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
     Flag,
     Info,
+    Loader2,
     Mail,
     MoreVertical,
     RefreshCcw,
@@ -11,11 +12,13 @@ import {
     Sparkles,
     ThumbsDown,
     ThumbsUp,
+    Wand2,
     X,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { usePolishText } from "@/lib/hooks/api";
 import { cn } from "@/lib/utils";
 import type { Draft } from "@/lib/api/commentGen";
 
@@ -69,7 +72,17 @@ type DraftCardProps = {
      *  the kebab exposes a mailto: shortcut that prefills the current
      *  (edited) draft text. null/undefined hides the action. */
     recipientEmail?: string | null;
+    /** Participant id for the Polish action (passed straight through to
+     *  the comment-gen /text/polish endpoint). When omitted the Polish
+     *  button is hidden — polish is a participant-scoped request. */
+    participantId?: number;
 };
+
+// How long the "Restore my original" affordance stays visible after a
+// successful polish. Long enough that a facilitator who didn't like
+// the rephrase can roll back, short enough that the link doesn't
+// linger in a stale state forever.
+const POLISH_UNDO_MS = 10_000;
 
 const FLAG_REASONS = [
     { id: "off-tone", label: "Off-tone or patronising" },
@@ -98,6 +111,7 @@ export function DraftCard({
     context,
     recipientName,
     recipientEmail,
+    participantId,
 }: DraftCardProps) {
     const [text, setText] = useState(draft.body);
     const [edited, setEdited] = useState(false);
@@ -107,6 +121,14 @@ export function DraftCard({
     const [flagReason, setFlagReason] = useState<string>(FLAG_REASONS[0].id);
     const [flagNotes, setFlagNotes] = useState("");
     const [rejected, setRejected] = useState(false);
+
+    // Polish-with-AI state. `polishShadow` holds the pre-polish text so a
+    // facilitator can roll back if the rephrased version isn't what they
+    // wanted. `polishError` surfaces a transient error pill if the call
+    // fails (offline Space, timeout). Both clear on next Polish click.
+    const [polishShadow, setPolishShadow] = useState<string | null>(null);
+    const [polishError, setPolishError] = useState<string | null>(null);
+    const polish = usePolishText();
 
     // No `reset state on draft change` effect: the parent already
     // remounts this component via `key={String(current.draft_id)}` when
@@ -129,6 +151,45 @@ export function DraftCard({
         document.addEventListener("mousedown", onClick);
         return () => document.removeEventListener("mousedown", onClick);
     }, [menuOpen]);
+
+    // Auto-expire the "Restore my original" affordance after
+    // POLISH_UNDO_MS so it doesn't linger forever.
+    useEffect(() => {
+        if (polishShadow === null) return;
+        const t = setTimeout(() => setPolishShadow(null), POLISH_UNDO_MS);
+        return () => clearTimeout(t);
+    }, [polishShadow]);
+
+    function clickPolish() {
+        if (!participantId || text.trim().length < 8 || polish.isPending) return;
+        setPolishError(null);
+        const before = text;
+        polish.mutate(
+            {
+                draft_text: before,
+                participant_id: participantId,
+                target_tone: "rephrase",
+            },
+            {
+                onSuccess: (res) => {
+                    setPolishShadow(before);
+                    setText(res.text);
+                    setEdited(true);
+                },
+                onError: (err) => setPolishError((err as Error).message),
+            },
+        );
+    }
+
+    function restoreOriginal() {
+        if (polishShadow === null) return;
+        setText(polishShadow);
+        setPolishShadow(null);
+        // Whether the original counted as an "edit" depends on whether
+        // the facilitator had typed before — we keep `edited=true` if
+        // they did, the parent's send-classification still treats this
+        // as a facilitator-curated draft either way.
+    }
 
     function clickThumb(label: "up" | "down") {
         setThumb(label);
@@ -210,10 +271,33 @@ export function DraftCard({
                         setText(e.target.value);
                         if (e.target.value !== draft.body) setEdited(true);
                     }}
-                    disabled={pending}
+                    disabled={pending || polish.isPending}
                     aria-label="Draft body"
                     className="rounded-none border-0 bg-transparent px-3 py-2.5 text-sm leading-relaxed text-text focus-visible:ring-0"
                 />
+
+                {(polishShadow !== null || polishError) && (
+                    <div className="flex items-center justify-between gap-2 border-t border-border bg-surface-2/40 px-3 py-1.5 text-xs">
+                        {polishError ? (
+                            <span className="text-risk-hi" title={polishError}>
+                                Polish failed — try again
+                            </span>
+                        ) : (
+                            <span className="text-muted">
+                                Polished by AI.
+                            </span>
+                        )}
+                        {polishShadow !== null && (
+                            <button
+                                type="button"
+                                onClick={restoreOriginal}
+                                className="text-accent-ink hover:underline"
+                            >
+                                Restore my original
+                            </button>
+                        )}
+                    </div>
+                )}
 
                 {/* Footer: refresh + chars  /  kebab + Send */}
                 <div className="flex items-center justify-between gap-2 border-t border-border px-3 py-2">
@@ -234,6 +318,27 @@ export function DraftCard({
                                 )}
                             />
                         </Button>
+                        {participantId !== undefined && (
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={clickPolish}
+                                disabled={
+                                    pending ||
+                                    polish.isPending ||
+                                    text.trim().length < 8
+                                }
+                                aria-label="Polish with AI"
+                                title="Fix spelling, grammar, and rephrase for clarity"
+                                className="h-7 w-7"
+                            >
+                                {polish.isPending ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                    <Wand2 className="h-3.5 w-3.5" />
+                                )}
+                            </Button>
+                        )}
                         <span>{chars} chars</span>
                         {context && isPersonalised(context) && (
                             <span

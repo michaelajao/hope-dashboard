@@ -1,12 +1,15 @@
+"use client";
+
 import { Avatar } from "@/components/avatar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { friendlyStatus } from "@/lib/risk";
-import { displayName } from "@/lib/signals";
+import { useBundleDisplayName } from "@/lib/hooks/displayName";
 import type { RiskLevel } from "@/lib/api/dropout";
 
 type QueueItemProps = {
     participantId: string;
+    cohortId?: number;
     riskLevel: RiskLevel;
     riskScore: number;
     lastActiveLabel?: string;
@@ -16,6 +19,7 @@ type QueueItemProps = {
 
 export function QueueItem({
     participantId,
+    cohortId,
     riskLevel,
     riskScore,
     lastActiveLabel,
@@ -23,6 +27,7 @@ export function QueueItem({
     onClick,
 }: QueueItemProps) {
     const status = friendlyStatus(riskLevel);
+    const aliasLabel = useBundleDisplayName(participantId, cohortId);
     return (
         <button
             type="button"
@@ -33,11 +38,15 @@ export function QueueItem({
                 selected && "border-border-2 bg-surface-2",
             )}
         >
-            <Avatar participantId={participantId} size="md" />
+            <Avatar
+                participantId={participantId}
+                cohortId={cohortId}
+                size="md"
+            />
             <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
                     <span className="truncate text-sm font-medium text-text">
-                        {displayName(participantId)}
+                        {aliasLabel}
                     </span>
                     <span className="shrink-0 text-xs tabular-nums text-muted">
                         {(riskScore * 100).toFixed(0)}%

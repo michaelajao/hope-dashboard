@@ -46,8 +46,3 @@ export const WELLBEING_CUE: Record<RiskLevel, string> = {
     low: "Light-touch encouragement keeps momentum without overloading their inbox.",
 };
 
-export const RECOMMENDED_APPROACH_BULLETS: string[] = [
-    "Keep the message short",
-    "Offer one simple next step",
-    "Invite a reply without pressure",
-];

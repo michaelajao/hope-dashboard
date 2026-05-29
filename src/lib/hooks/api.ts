@@ -13,7 +13,9 @@ import type {
     GenerateResponse,
     MemoryEntry,
     ModelsResponse,
+    PolishRequest,
     SwitchModelResponse,
+    TextGenResponse,
     ThumbRequest,
 } from "@/lib/api/commentGen";
 import type {
@@ -113,6 +115,13 @@ export function useGenerate() {
     return useMutation({
         mutationFn: (body: GenerateRequest) =>
             postJSON<GenerateResponse>("/api/proxy/generate", body),
+    });
+}
+
+export function usePolishText() {
+    return useMutation({
+        mutationFn: (body: PolishRequest) =>
+            postJSON<TextGenResponse>("/api/proxy/text/polish", body),
     });
 }
 

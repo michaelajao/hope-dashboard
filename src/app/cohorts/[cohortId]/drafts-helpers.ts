@@ -34,12 +34,21 @@ export const MODEL_VERSION_FALLBACKS: Record<string, string> = {
 /**
  * Render the badge label for a draft response's ``model_version`` field.
  *
- *  - Hub ids (``namespace/repo``) drop the namespace and trim the
- *    ``-lora`` suffix: ``michaelajao/qwen3-1.7b-hope-only-lora`` →
- *    ``qwen3-1.7b-hope-only``.
+ * Goal: surface the base model identity to the facilitator, not the
+ * training-roster suffix. The roster name ("hope-only") was useful when
+ * we shipped multiple LoRA variants per base; now that the only
+ * variants we serve are the Hope-only adapters, that suffix is just
+ * noise in the UI.
+ *
+ *  - Hub ids (``namespace/repo``) drop the namespace, the ``-lora``
+ *    suffix, and the ``-hope-only`` segment:
+ *    ``michaelajao/qwen3-1.7b-hope-only-lora`` → ``Qwen3 1.7B``;
+ *    ``michaelajao/qwen3-4b-hope-only-v5-lora`` → ``Qwen3 4B v5``.
+ *  - Tokens that look like a size (``1.7b``, ``4b``) get an upper-case
+ *    ``B``. Version tokens (``v5``) stay lower-case. Other alphabetic
+ *    tokens are title-cased.
  *  - Non-SLM versions (the kill-switch / safety / fallback strings) get
  *    their friendly mapping from MODEL_VERSION_FALLBACKS.
- *  - Anything else (a local registry id without slash) round-trips.
  */
 export function formatModelLabel(modelVersion: string): string {
     if (MODEL_VERSION_FALLBACKS[modelVersion]) {
@@ -48,7 +57,26 @@ export function formatModelLabel(modelVersion: string): string {
     const afterSlash = modelVersion.includes("/")
         ? modelVersion.split("/").pop()!
         : modelVersion;
-    return afterSlash.replace(/-lora$/, "");
+    const stripped = afterSlash
+        .replace(/-lora$/, "")
+        .replace(/-hope-only/g, "");
+    return stripped
+        .split("-")
+        .filter(Boolean)
+        .map((part) => {
+            // Size tokens like "1.7b", "4b", "0.6b" → upper-case the B.
+            if (/^\d/.test(part) && part.endsWith("b")) {
+                return part.slice(0, -1) + "B";
+            }
+            // Version tokens like "v5" stay lowercase.
+            if (/^v\d+$/i.test(part)) return part.toLowerCase();
+            // Family / other alphabetic tokens — title-case.
+            if (/^[a-z]/.test(part)) {
+                return part[0].toUpperCase() + part.slice(1);
+            }
+            return part;
+        })
+        .join(" ");
 }
 
 /**

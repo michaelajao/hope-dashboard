@@ -31,7 +31,6 @@ import {
     useScoringStore,
 } from "@/lib/store/scoringStore";
 import { useUiStore } from "@/lib/store/uiStore";
-import { RECOMMENDED_APPROACH_BULLETS } from "@/lib/risk";
 import { DAY_MS, daysSinceLastEvent } from "@/lib/signals";
 import type { CohortMeta } from "@/lib/cohorts";
 import type {
@@ -86,6 +85,11 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
     // Reset whenever a new generation lands so the focus snaps to the
     // first persona for the new post.
     const [activePersona, setActivePersona] = useState<Persona | null>(null);
+    // "Write my own" mode: facilitator types from scratch and (optionally)
+    // polishes with AI. Bypasses the persona generator entirely; the
+    // existing DraftCard is reused with a synthesized blank draft so
+    // Polish + Send wiring stays consistent.
+    const [writeMode, setWriteMode] = useState(false);
 
     // Derive the participant's most recent post within the current
     // scoring window. The dashboard is read-only on the participant
@@ -324,20 +328,40 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                         </p>
                     </div>
                 )}
-                <Button
-                    onClick={onGenerate}
-                    disabled={!postText.trim() || generate.isPending}
-                    className="w-full gap-1.5"
-                >
-                    {response ? (
-                        <RefreshCcw className="h-3.5 w-3.5" aria-hidden />
-                    ) : null}
-                    {generate.isPending
-                        ? "Generating…"
-                        : response
-                          ? "Regenerate"
-                          : "Generate drafts"}
-                </Button>
+                <div className="flex gap-2">
+                    <Button
+                        onClick={onGenerate}
+                        disabled={
+                            !postText.trim() ||
+                            generate.isPending ||
+                            writeMode
+                        }
+                        className="flex-1 gap-1.5"
+                    >
+                        {response ? (
+                            <RefreshCcw className="h-3.5 w-3.5" aria-hidden />
+                        ) : null}
+                        {generate.isPending
+                            ? "Generating…"
+                            : response
+                              ? "Regenerate"
+                              : "Generate drafts"}
+                    </Button>
+                    <Button
+                        type="button"
+                        variant={writeMode ? "primary" : "secondary"}
+                        onClick={() => setWriteMode((v) => !v)}
+                        disabled={generate.isPending}
+                        title={
+                            writeMode
+                                ? "Back to AI-drafted personas"
+                                : "Write your own reply from scratch (still gets the Polish button)"
+                        }
+                        className="whitespace-nowrap gap-1.5"
+                    >
+                        {writeMode ? "Use AI drafts" : "Write my own"}
+                    </Button>
+                </div>
 
                 {response?.safety_signposting && (
                     <div className="rounded-md border border-risk-md bg-risk-md-bg px-3 py-2 text-xs text-risk-md">
@@ -371,7 +395,61 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                     </div>
                 )}
 
-                {response && (() => {
+                {writeMode && (() => {
+                    // Synthesize a blank Draft so DraftCard's existing
+                    // textarea + Polish + Send wiring is reused as-is.
+                    // The "AI persona" framing is hidden by giving the
+                    // synthetic draft a neutral label and rendering
+                    // without persona tabs above.
+                    const blankDraft: Draft = {
+                        persona: "Empathetic",
+                        label: "Warm personal check-in",
+                        body: "",
+                        draft_id: ("00000000-0000-0000-0000-" +
+                            String(selectedId)
+                                .padStart(12, "0")
+                                .slice(-12)) as unknown as Draft["draft_id"],
+                    };
+                    const ctx: DraftContext = {
+                        topFactors: prediction.data?.contributing_factors ?? [],
+                        lastActiveDays: history
+                            ? daysSinceLastEvent(history)
+                            : null,
+                        memoryUsed: false,
+                        engagementUsed: false,
+                        displayName: profile.displayName,
+                    };
+                    return (
+                        <div className="space-y-3">
+                            <div className="flex items-center gap-1.5 text-xs text-muted">
+                                <Sparkles
+                                    className="h-3 w-3 text-accent-ink"
+                                    aria-hidden
+                                />
+                                Write your reply below. Click the wand to
+                                polish spelling, grammar, and tone.
+                            </div>
+                            <DraftCard
+                                key={`writemode-${selectedId}`}
+                                draft={blankDraft}
+                                onThumb={() => {
+                                    /* no AI to rate */
+                                }}
+                                onSend={onSend}
+                                pending={event.isPending}
+                                context={ctx}
+                                recipientName={displayName}
+                                recipientEmail={recipientEmail}
+                                participantId={Number(
+                                    String(selectedId).replace(/[^0-9]/g, "") ||
+                                        "0",
+                                )}
+                            />
+                        </div>
+                    );
+                })()}
+
+                {!writeMode && response && (() => {
                     const drafts = response.drafts;
                     if (drafts.length === 0) return null;
                     const current: Draft =
@@ -404,7 +482,7 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                                             <button
                                                 key={String(d.draft_id)}
                                                 role="tab"
-                                                aria-selected={isActive ? "true" : "false"}
+                                                aria-selected={isActive}
                                                 type="button"
                                                 onClick={() =>
                                                     setActivePersona(d.persona)
@@ -436,28 +514,13 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                                 context={ctx}
                                 recipientName={displayName}
                                 recipientEmail={recipientEmail}
+                                participantId={Number(
+                                    String(selectedId).replace(/[^0-9]/g, "") || "0",
+                                )}
                             />
                         </div>
                     );
                 })()}
-                {response && (
-                    <details className="group rounded-lg border border-border bg-surface-2 px-3 py-2">
-                        <summary className="flex cursor-pointer select-none items-center justify-between text-xs font-semibold uppercase tracking-wide text-muted">
-                            Recommended approach
-                            <span className="text-[10px] text-muted/70 group-open:hidden">
-                                show
-                            </span>
-                            <span className="hidden text-[10px] text-muted/70 group-open:inline">
-                                hide
-                            </span>
-                        </summary>
-                        <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-text-2">
-                            {RECOMMENDED_APPROACH_BULLETS.map((b) => (
-                                <li key={b}>{b}</li>
-                            ))}
-                        </ul>
-                    </details>
-                )}
             </CardContent>
             <div className="px-6 pb-6">
                 <FollowUpActivity

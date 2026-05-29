@@ -8,9 +8,21 @@ import {
 } from "./drafts-helpers";
 
 describe("formatModelLabel", () => {
-    it("strips namespace + -lora suffix from HF Hub ids", () => {
+    it("strips namespace + -lora + -hope-only from HF Hub ids", () => {
         expect(formatModelLabel("michaelajao/qwen3-1.7b-hope-only-lora")).toBe(
-            "qwen3-1.7b-hope-only",
+            "Qwen3 1.7B",
+        );
+    });
+
+    it("preserves version segments (v5) and pretty-prints sizes", () => {
+        expect(
+            formatModelLabel("michaelajao/qwen3-4b-hope-only-v5-lora"),
+        ).toBe("Qwen3 4B v5");
+    });
+
+    it("handles the smallest model id", () => {
+        expect(formatModelLabel("michaelajao/qwen3-0.6b-hope-only-lora")).toBe(
+            "Qwen3 0.6B",
         );
     });
 
@@ -26,14 +38,14 @@ describe("formatModelLabel", () => {
         expect(formatModelLabel("error-fallback")).toBe("fallback");
     });
 
-    it("round-trips a local registry id (no slash, not in map)", () => {
-        expect(formatModelLabel("qwen3-1.7b-hope-only")).toBe(
-            "qwen3-1.7b-hope-only",
-        );
+    it("also strips -hope-only from a local registry id (no slash)", () => {
+        expect(formatModelLabel("qwen3-1.7b-hope-only")).toBe("Qwen3 1.7B");
     });
 
     it("handles an id that has a slash but no -lora suffix", () => {
-        expect(formatModelLabel("acme/my-custom-model")).toBe("my-custom-model");
+        expect(formatModelLabel("acme/my-custom-model")).toBe(
+            "My Custom Model",
+        );
     });
 });
 

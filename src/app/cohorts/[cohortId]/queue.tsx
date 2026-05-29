@@ -22,7 +22,8 @@ import {
 import { useUiStore } from "@/lib/store/uiStore";
 import { useQueueStore } from "@/lib/store/queueStore";
 import { QUEUE_PILL_LABELS } from "@/lib/risk";
-import { lastActiveLabel, displayName } from "@/lib/signals";
+import { lastActiveLabel } from "@/lib/signals";
+import { useBundleDisplayName } from "@/lib/hooks/displayName";
 import type { CohortMeta } from "@/lib/cohorts";
 import type {
     ParticipantHistory,
@@ -210,6 +211,7 @@ export function Queue({ cohort }: { cohort: CohortMeta }) {
                         <QueueItem
                             key={p.participant_id}
                             participantId={p.participant_id}
+                            cohortId={cohort.id}
                             riskLevel={p.risk_level}
                             riskScore={p.dropout_risk}
                             lastActiveLabel={lastActiveLabel(hist)}
@@ -286,46 +288,57 @@ export function Queue({ cohort }: { cohort: CohortMeta }) {
                         </button>
                         {showHidden && (
                             <ul className="mt-2 space-y-1">
-                                {hidden.map((p) => {
-                                    const isDismissed = Boolean(
-                                        dismissedAt[p.participant_id],
-                                    );
-                                    return (
-                                        <li
-                                            key={p.participant_id}
-                                            className="flex items-center justify-between gap-2 rounded-md border border-border bg-surface-2 px-2.5 py-1.5"
-                                        >
-                                            <span className="truncate text-xs text-text-2">
-                                                {displayName(p.participant_id)}
-                                                <span className="ml-1.5 text-muted">
-                                                    {isDismissed
-                                                        ? "dismissed"
-                                                        : "snoozed"}
-                                                </span>
-                                            </span>
-                                            <button
-                                                type="button"
-                                                onClick={() =>
-                                                    isDismissed
-                                                        ? undoDismiss(
-                                                              p.participant_id,
-                                                          )
-                                                        : undoSnooze(
-                                                              p.participant_id,
-                                                          )
-                                                }
-                                                className="text-xs text-accent-ink hover:underline"
-                                            >
-                                                Undo
-                                            </button>
-                                        </li>
-                                    );
-                                })}
+                                {hidden.map((p) => (
+                                    <HiddenRow
+                                        key={p.participant_id}
+                                        participantId={p.participant_id}
+                                        cohortId={cohort.id}
+                                        isDismissed={Boolean(
+                                            dismissedAt[p.participant_id],
+                                        )}
+                                        onUndo={() =>
+                                            dismissedAt[p.participant_id]
+                                                ? undoDismiss(p.participant_id)
+                                                : undoSnooze(p.participant_id)
+                                        }
+                                    />
+                                ))}
                             </ul>
                         )}
                     </div>
                 )}
             </CardContent>
         </Card>
+    );
+}
+
+function HiddenRow({
+    participantId,
+    cohortId,
+    isDismissed,
+    onUndo,
+}: {
+    participantId: string;
+    cohortId: number;
+    isDismissed: boolean;
+    onUndo: () => void;
+}) {
+    const alias = useBundleDisplayName(participantId, cohortId);
+    return (
+        <li className="flex items-center justify-between gap-2 rounded-md border border-border bg-surface-2 px-2.5 py-1.5">
+            <span className="truncate text-xs text-text-2">
+                {alias}
+                <span className="ml-1.5 text-muted">
+                    {isDismissed ? "dismissed" : "snoozed"}
+                </span>
+            </span>
+            <button
+                type="button"
+                onClick={onUndo}
+                className="text-xs text-accent-ink hover:underline"
+            >
+                Undo
+            </button>
+        </li>
     );
 }

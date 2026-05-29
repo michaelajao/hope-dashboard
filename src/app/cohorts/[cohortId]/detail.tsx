@@ -26,10 +26,10 @@ import { friendlyStatus } from "@/lib/risk";
 import type { ParticipantHistory } from "@/lib/api/dropout";
 import {
     daysSinceLastEvent,
-    displayName,
     eventsLastNDays,
     facilitatorContactCount,
 } from "@/lib/signals";
+import { useBundleDisplayName } from "@/lib/hooks/displayName";
 
 export function Detail({
     cohortId,
@@ -48,6 +48,7 @@ export function Detail({
         return bundleToHistory(bundle.data, selectedId, scoreAt);
     }, [selectedId, bundle.data, scoreAt]);
     const prediction = useParticipantPrediction(history, cohortId);
+    const aliasLabel = useBundleDisplayName(selectedId ?? "", cohortId);
 
     // Neighbour navigation: derive prev/next from the cohort bundle's
     // participant order. Falls back to no-op when the bundle hasn't
@@ -87,7 +88,7 @@ export function Detail({
         );
     }
 
-    const name = displayName(selectedId);
+    const name = aliasLabel;
     const status = prediction.data
         ? friendlyStatus(prediction.data.risk_level)
         : null;
@@ -97,7 +98,11 @@ export function Detail({
             <CardHeader>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                        <Avatar participantId={selectedId} size="lg" />
+                        <Avatar
+                            participantId={selectedId}
+                            cohortId={cohortId}
+                            size="lg"
+                        />
                         <div>
                             <CardTitle>{name}</CardTitle>
                             <p className="text-xs text-muted">
