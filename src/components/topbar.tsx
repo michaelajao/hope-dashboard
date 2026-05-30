@@ -51,14 +51,6 @@ export function Topbar({ cohort }: TopbarProps) {
                         hope·move
                     </span>
                 </Link>
-                {process.env.NEXT_PUBLIC_AUTH_MODE === "open" && (
-                    <span
-                        title="AUTH_MODE=open — any email signs in. Flip to allowlist for production."
-                        className="rounded-md border border-risk-md bg-risk-md-bg px-2 py-0.5 text-[11px] font-medium text-risk-md"
-                    >
-                        Testing mode
-                    </span>
-                )}
                 <nav
                     aria-label="breadcrumb"
                     className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-muted"

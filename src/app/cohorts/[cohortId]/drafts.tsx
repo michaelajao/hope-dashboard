@@ -184,10 +184,9 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
 
     // Best-effort: seed prior posts the first time we open this
     // participant's panel, so the next /generate has memory to retrieve.
-    // When the real cohort bundle is present, seeds come from the actual
-    // platform export (activity descriptions + facilitator replies); when
-    // it isn't, falls back to the synthetic SEED_TEMPLATES so a fresh
-    // clone still demos memory retrieval.
+    // Seeds come from the real cohort bundle (activity descriptions +
+    // facilitator replies). With no bundle there's nothing to seed — the
+    // old synthetic-template path is retired (SEED_TEMPLATES is empty).
     //
     // Idempotent (de-duped inside seedDemoMemory) and silent on failure
     // (comment-gen offline = no-op via the proxy's degrade-to-skipped).

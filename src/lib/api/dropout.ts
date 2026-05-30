@@ -104,6 +104,14 @@ export type PredictionResponse = {
     // rule-based fallback supplies the factors. Dashboard falls back to
     // decaying synthetic weights when this field is missing.
     contributing_factor_weights?: number[];
+
+    // Optional. Aligned with `contributing_factors` 1:1. Per-factor SHAP
+    // direction: "up" raises this person's risk, "down" lowers it. Lets the
+    // dashboard render each driver with its own arrow/colour (so a protective
+    // driver isn't shown as if it raised risk, and vice-versa). Absent until
+    // the engagement_ml Space is redeployed — DriverBars falls back to a
+    // single tone-based direction in that case.
+    contributing_factor_directions?: ("up" | "down")[];
 };
 
 export type BatchResponse = {

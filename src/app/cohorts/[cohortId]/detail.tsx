@@ -193,7 +193,17 @@ export function Detail({
                     {prediction.data?.contributing_factors?.length ? (
                         <div className="min-w-0 flex-1">
                             <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">
-                                Why {name} is highlighted
+                                {/* The factors are SHAP drivers, each with its
+                                    own direction (DriverBars shows ↑ raising /
+                                    ↓ lowering). The top-3 mix directions even
+                                    for a flagged participant, so a flat "why
+                                    flagged" header would mislabel the
+                                    protective ones — keep the header neutral
+                                    for non-low and let the per-bar arrows
+                                    carry the direction. */}
+                                {prediction.data.risk_level === "low"
+                                    ? `What's going well for ${name}`
+                                    : `What's driving ${name}'s risk`}
                             </h4>
                             <div className="mt-3">
                                 <DriverBars
@@ -203,6 +213,10 @@ export function Detail({
                                     weights={
                                         prediction.data
                                             .contributing_factor_weights
+                                    }
+                                    directions={
+                                        prediction.data
+                                            .contributing_factor_directions
                                     }
                                     tone={prediction.data.risk_level}
                                 />

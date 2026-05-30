@@ -40,9 +40,10 @@ import type { Draft } from "@/lib/api/commentGen";
  *  - Body is a borderless inline textarea — no Edit button
  *  - Refresh icon at bottom-left → triggers regenerate via onRegenerate
  *  - Char counter next to it
- *  - Kebab menu hides the HITL controls (thumb up/down, reject, flag)
- *    so the default view is clean but training-data collection still
- *    happens. Click the kebab to expand.
+ *  - Draft-quality feedback (👍/👎) is surfaced inline in the footer with
+ *    a visible "Helpful?" prompt, so facilitators can see it and know what
+ *    it does. The kebab keeps the rarer actions (send by email, reject,
+ *    flag for review).
  *  - "What this draft is based on" disclosure stays below (transparency)
  */
 
@@ -236,6 +237,10 @@ export function DraftCard({
 
     const toName = recipientName ?? context?.displayName ?? "the participant";
     const chars = text.length;
+    // Only show the kebab when it has at least one action — otherwise an
+    // empty popover would open. (Thumb up/down moved inline to the footer.)
+    const hasMenuActions =
+        Boolean(recipientEmail) || Boolean(onReject) || Boolean(onFlag);
 
     if (rejected) {
         return (
@@ -299,8 +304,8 @@ export function DraftCard({
                     </div>
                 )}
 
-                {/* Footer: refresh + chars  /  kebab + Send */}
-                <div className="flex items-center justify-between gap-2 border-t border-border px-3 py-2">
+                {/* Footer: refresh + chars  /  helpful? + kebab + Send */}
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-3 py-2">
                     <div className="flex items-center gap-2 text-xs text-muted">
                         <Button
                             variant="ghost"
@@ -350,24 +355,67 @@ export function DraftCard({
                             </span>
                         )}
                     </div>
-                    <div className="flex items-center gap-1.5">
-                        <div className="relative" ref={menuRef}>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                aria-label="More actions"
-                                aria-haspopup="menu"
-                                aria-expanded={menuOpen}
-                                onClick={() => setMenuOpen((v) => !v)}
-                                disabled={pending}
-                                className="h-7 w-7 text-muted hover:text-text-2"
-                            >
-                                <MoreVertical className="h-4 w-4" />
-                            </Button>
+                    <div className="flex items-center gap-1">
+                        {/* Inline draft-quality feedback. Visible + labelled
+                            so facilitators know it exists and what it does;
+                            the signal feeds the HITL improvement loop. */}
+                        <span className="mr-0.5 text-[11px] text-muted">
+                            {thumb ? "Thanks!" : "Helpful?"}
+                        </span>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => clickThumb("up")}
+                            disabled={pending}
+                            aria-label="Mark this draft as a good reply"
+                            aria-pressed={thumb === "up"}
+                            title="Good reply — tells the system to suggest more like this"
+                            className={cn(
+                                "h-7 w-7 text-muted hover:text-risk-lo",
+                                thumb === "up" && "text-risk-lo",
+                            )}
+                        >
+                            <ThumbsUp className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => clickThumb("down")}
+                            disabled={pending}
+                            aria-label="Mark this draft as a poor reply"
+                            aria-pressed={thumb === "down"}
+                            title="Not useful — helps improve future AI drafts"
+                            className={cn(
+                                "h-7 w-7 text-muted hover:text-risk-hi",
+                                thumb === "down" && "text-risk-hi",
+                            )}
+                        >
+                            <ThumbsDown className="h-3.5 w-3.5" />
+                        </Button>
+                        {hasMenuActions && (
+                            <div className="relative" ref={menuRef}>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    aria-label="More actions"
+                                    aria-haspopup="menu"
+                                    aria-expanded={menuOpen}
+                                    onClick={() => setMenuOpen((v) => !v)}
+                                    disabled={pending}
+                                    className="h-7 w-7 text-muted hover:text-text-2"
+                                >
+                                    <MoreVertical className="h-4 w-4" />
+                                </Button>
                             {menuOpen && (
                                 <div
                                     role="menu"
-                                    className="absolute right-0 z-10 mt-1 w-48 overflow-hidden rounded-md border border-border bg-surface shadow-md"
+                                    // The kebab lives in the card's bottom
+                                    // footer, so a downward menu (mt-1) spills
+                                    // below the card and gets painted behind
+                                    // the next card. Open UPWARD over the
+                                    // card's own (taller) body, and lift above
+                                    // sibling cards with z-50.
+                                    className="absolute bottom-full right-0 z-50 mb-1 w-48 overflow-hidden rounded-md border border-border bg-surface shadow-md"
                                 >
                                     {recipientEmail && (
                                         <button
@@ -381,30 +429,6 @@ export function DraftCard({
                                             Send by email
                                         </button>
                                     )}
-                                    <button
-                                        type="button"
-                                        role="menuitem"
-                                        onClick={() => clickThumb("up")}
-                                        className={cn(
-                                            "flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-surface-2",
-                                            thumb === "up" && "text-risk-lo",
-                                        )}
-                                    >
-                                        <ThumbsUp className="h-3.5 w-3.5" />
-                                        Thumb up
-                                    </button>
-                                    <button
-                                        type="button"
-                                        role="menuitem"
-                                        onClick={() => clickThumb("down")}
-                                        className={cn(
-                                            "flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-surface-2",
-                                            thumb === "down" && "text-risk-hi",
-                                        )}
-                                    >
-                                        <ThumbsDown className="h-3.5 w-3.5" />
-                                        Thumb down
-                                    </button>
                                     {onReject && (
                                         <button
                                             type="button"
@@ -432,7 +456,8 @@ export function DraftCard({
                                     )}
                                 </div>
                             )}
-                        </div>
+                            </div>
+                        )}
                         <Button
                             size="sm"
                             onClick={clickSend}
