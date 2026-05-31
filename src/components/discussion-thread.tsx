@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { MessageCircle } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -24,19 +25,39 @@ export function DiscussionThread({
     focalText: string;
 }) {
     const focal = focalText.trim();
+    const olRef = useRef<HTMLOListElement>(null);
+    const focalRef = useRef<HTMLLIElement>(null);
+
+    // The thread renders in a fixed-height scroll box; the focal post can sit
+    // deep in a long thread, so scroll the box (not the page) to centre it —
+    // otherwise the panel lands on the thread tail and the facilitator sees
+    // the wrong message. With duplicate focal texts the last <li> wins the
+    // ref, matching renderThreadContext's last-match choice.
+    useEffect(() => {
+        const ol = olRef.current;
+        const li = focalRef.current;
+        if (!ol || !li) return;
+        const target = li.offsetTop - ol.clientHeight / 2 + li.clientHeight / 2;
+        ol.scrollTop = Math.max(0, target);
+    }, [focalText, thread]);
+
     return (
         <div className="rounded-md border border-border bg-surface-2">
             <div className="flex items-center gap-1.5 border-b border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted">
                 <MessageCircle className="h-3.5 w-3.5" aria-hidden />
                 {thread.title}
             </div>
-            <ol className="max-h-64 space-y-2 overflow-y-auto px-3 py-2.5">
+            <ol
+                ref={olRef}
+                className="relative max-h-64 space-y-2 overflow-y-auto px-3 py-2.5"
+            >
                 {thread.replies.map((r, i) => {
                     const isFocal = r.text.trim() === focal;
                     const isFacilitator = r.role === "facilitator";
                     return (
                         <li
                             key={`${r.recordedAt}-${i}`}
+                            ref={isFocal ? focalRef : undefined}
                             className={cn(
                                 "rounded-md px-2.5 py-1.5 text-sm",
                                 isFocal
