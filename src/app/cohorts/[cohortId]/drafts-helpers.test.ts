@@ -20,6 +20,12 @@ describe("formatModelLabel", () => {
         ).toBe("Qwen3 4B");
     });
 
+    it("tags forum-trained adapters with (forum)", () => {
+        expect(
+            formatModelLabel("michaelajao/qwen3-4b-hope-forum-lora"),
+        ).toBe("Qwen3 4B (forum)");
+    });
+
     it("handles the smallest model id", () => {
         expect(formatModelLabel("michaelajao/qwen3-0.6b-hope-only-lora")).toBe(
             "Qwen3 0.6B",

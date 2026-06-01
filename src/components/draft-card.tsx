@@ -40,11 +40,10 @@ import type { Draft } from "@/lib/api/commentGen";
  *  - Body is a borderless inline textarea — no Edit button
  *  - Refresh icon at bottom-left → triggers regenerate via onRegenerate
  *  - Char counter next to it
- *  - Draft-quality feedback (👍/👎) is surfaced inline in the footer with
- *    a visible "Helpful?" prompt, so facilitators can see it and know what
- *    it does. The kebab keeps the rarer actions (send by email, reject,
- *    flag for review).
- *  - "What this draft is based on" disclosure stays below (transparency)
+ *  - Draft-quality feedback (👍/👎) is inline in the footer with a visible
+ *    "Helpful?" prompt. The kebab keeps the rarer actions (send by email,
+ *    reject, flag for review).
+ *  - "What this draft is based on" disclosure stays below
  */
 
 export type DraftContext = {
@@ -237,8 +236,8 @@ export function DraftCard({
 
     const toName = recipientName ?? context?.displayName ?? "the participant";
     const chars = text.length;
-    // Only show the kebab when it has at least one action — otherwise an
-    // empty popover would open. (Thumb up/down moved inline to the footer.)
+    // Only show the kebab when it has at least one action; an empty popover
+    // would otherwise open. (Thumb up/down moved inline to the footer.)
     const hasMenuActions =
         Boolean(recipientEmail) || Boolean(onReject) || Boolean(onFlag);
 
@@ -356,9 +355,9 @@ export function DraftCard({
                         )}
                     </div>
                     <div className="flex items-center gap-1">
-                        {/* Inline draft-quality feedback. Visible + labelled
-                            so facilitators know it exists and what it does;
-                            the signal feeds the HITL improvement loop. */}
+                        {/* Inline draft-quality feedback, visible and
+                            labelled. The signal feeds the HITL improvement
+                            loop. */}
                         <span className="mr-0.5 text-[11px] text-muted">
                             {thumb ? "Thanks!" : "Helpful?"}
                         </span>

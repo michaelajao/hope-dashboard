@@ -50,11 +50,9 @@ const FAMILY_DISPLAY_OVERRIDES: Record<string, string> = {
 /**
  * Render the badge label for a draft response's ``model_version`` field.
  *
- * Goal: surface the base model identity to the facilitator, not the
- * training-roster suffix. The roster name ("hope-only") was useful when
- * we shipped multiple LoRA variants per base; now that the only
- * variants we serve are the Hope-only adapters, that suffix is just
- * noise in the UI.
+ * Goal: surface the base model identity and training corpus to the
+ * facilitator, not the internal roster suffix. "-hope-only" is dropped as
+ * UI noise; "-hope-forum" instead shows a "(forum)" tag.
  *
  *  - Hub ids (``namespace/repo``) drop the namespace, the ``-lora``
  *    suffix, the ``-hope-only`` segment, AND training-version tokens
@@ -74,13 +72,16 @@ export function formatModelLabel(modelVersion: string): string {
     const afterSlash = modelVersion.includes("/")
         ? modelVersion.split("/").pop()!
         : modelVersion;
+    // Forum-trained adapters carry a "-hope-forum" segment; surface it as a
+    // "(forum)" suffix to match the picker. "-hope-only" stays a silent strip.
+    const isForum = /-hope-forum/.test(afterSlash);
     const stripped = afterSlash
         .replace(/-lora$/, "")
-        .replace(/-hope-only/g, "")
+        .replace(/-hope-(?:only|forum)/g, "")
         // Drop training-iteration version tokens (e.g. "-v5"). Internal
         // tag; not facilitator-facing.
         .replace(/-v\d+/g, "");
-    return stripped
+    const base = stripped
         .split("-")
         .filter(Boolean)
         .map((part, idx) => {
@@ -101,6 +102,7 @@ export function formatModelLabel(modelVersion: string): string {
             return part;
         })
         .join(" ");
+    return isForum ? `${base} (forum)` : base;
 }
 
 /**

@@ -182,11 +182,11 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
     const thumb = useThumb();
     const event = useEvent();
 
-    // Best-effort: seed prior posts the first time we open this
-    // participant's panel, so the next /generate has memory to retrieve.
-    // Seeds come from the real cohort bundle (activity descriptions +
-    // facilitator replies). With no bundle there's nothing to seed — the
-    // old synthetic-template path is retired (SEED_TEMPLATES is empty).
+    // Best-effort: seed prior posts the first time this participant's panel
+    // opens, so the next /generate has memory to retrieve. Seeds come from the
+    // real cohort bundle (activity descriptions + facilitator replies). With no
+    // bundle there's nothing to seed (the old synthetic-template path is
+    // retired, SEED_TEMPLATES is empty).
     //
     // Idempotent (de-duped inside seedDemoMemory) and silent on failure
     // (comment-gen offline = no-op via the proxy's degrade-to-skipped).

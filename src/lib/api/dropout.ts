@@ -107,10 +107,10 @@ export type PredictionResponse = {
 
     // Optional. Aligned with `contributing_factors` 1:1. Per-factor SHAP
     // direction: "up" raises this person's risk, "down" lowers it. Lets the
-    // dashboard render each driver with its own arrow/colour (so a protective
+    // dashboard render each driver with its own arrow/colour (a protective
     // driver isn't shown as if it raised risk, and vice-versa). Absent until
-    // the engagement_ml Space is redeployed — DriverBars falls back to a
-    // single tone-based direction in that case.
+    // the engagement_ml Space is redeployed; DriverBars then falls back to a
+    // single tone-based direction.
     contributing_factor_directions?: ("up" | "down")[];
 };
 

@@ -145,12 +145,11 @@ function facilitatorDensity(bundle: CohortBundle): number {
     return Number((touched / bundle.participants.length).toFixed(2));
 }
 
-/** How much forum thread we feed the model as `thread_context`. Threads run
- * to ~125 replies, so we send two small, useful slices — the topic OPENING
- * (the facilitators' framing posts, so the model knows what kind of thread it
- * is) and the few replies JUST BEFORE the post being answered. The focal post
- * itself is NOT included here: it's sent in full via `post_text`, so including
- * it would duplicate it and risk the char budget truncating it. */
+/** How much forum thread feeds the model as `thread_context`. Threads run to
+ * ~125 replies, so send two slices: the topic OPENING (facilitator framing
+ * posts) and the few replies JUST BEFORE the post being answered. The focal
+ * post is excluded here; it's sent in full via `post_text`, so including it
+ * would duplicate it and risk the char budget truncating it. */
 const THREAD_CONTEXT_OPENING_REPLIES = 2; // topic-framing posts at the top
 const THREAD_CONTEXT_PRECEDING_REPLIES = 4; // replies right before the focal
 const THREAD_CONTEXT_PER_POST_CHARS = 280; // clip any single reply
@@ -158,16 +157,16 @@ const THREAD_CONTEXT_MAX_CHARS = 2000; // overall safety cap (never hits focal)
 
 /**
  * Render a forum topic into a compact text block for the comment-gen
- * `thread_context` field. We give the model two things it needs to reply in
- * context: the topic OPENING (facilitator framing) and the replies JUST BEFORE
- * the post being answered — each prefixed with the author alias. The focal post
- * is deliberately excluded; it reaches the model in full via `post_text`.
+ * `thread_context` field. Includes two slices: the topic OPENING (facilitator
+ * framing) and the replies JUST BEFORE the post being answered, each prefixed
+ * with the author alias. The focal post is excluded; it reaches the model in
+ * full via `post_text`.
  *
- * `focalText` identifies the post being replied to. We match the LAST reply
- * with that exact text — intro threads contain duplicate texts, and in a
- * chronological thread the most recent occurrence is the live one. On a miss we
- * fall back to a plain tail window so the model still gets some context.
- * Returns "" when the topic isn't in the bundle or has no usable replies.
+ * `focalText` identifies the post being replied to. Matches the LAST reply with
+ * that exact text: intro threads contain duplicate texts, and in a chronological
+ * thread the most recent occurrence is the live one. On a miss, falls back to a
+ * plain tail window. Returns "" when the topic isn't in the bundle or has no
+ * usable replies.
  */
 export function renderThreadContext(
     bundle: CohortBundle,

@@ -11,11 +11,11 @@ type DriverBarsProps = {
     weights?: number[];
     /** Aligned 1:1 with `factors`. Per-factor SHAP direction: "up" raises
      *  this person's risk, "down" lowers it. When present, each bar is
-     *  coloured + arrowed by its own direction — so a protective driver in a
+     *  coloured and arrowed by its own direction, so a protective driver in a
      *  flagged participant's top-3 (or a risk driver in a low-risk one's)
-     *  reads honestly instead of inheriting one direction for the whole
-     *  panel. When absent (API not yet redeployed), falls back to the
-     *  tone-based single direction below. */
+     *  keeps its own direction instead of inheriting the panel's. When absent
+     *  (API not yet redeployed), falls back to the tone-based single direction
+     *  below. */
     directions?: Direction[];
     /** Tier-derived accent, used only for the fallback when `directions` is
      *  absent. Defaults to text. */
@@ -52,10 +52,10 @@ export function DriverBars({
     const total = w.reduce((a, b) => a + b, 0);
     const estimated = !weights;
 
-    // Per-factor direction is the honest mode: each driver knows whether it
-    // raised or lowered this person's risk. We only use it when the backend
-    // supplied one entry per factor; otherwise fall back to a single
-    // tone-derived direction (low risk → protective, else → risk).
+    // Per-factor direction: each driver carries whether it raised or lowered
+    // this person's risk. Used only when the backend supplied one entry per
+    // factor; otherwise fall back to a single tone-derived direction (low
+    // risk → protective, else → risk).
     const hasDirections =
         Array.isArray(directions) && directions.length === factors.length;
     const protectiveFallback = tone === "low";

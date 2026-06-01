@@ -29,10 +29,10 @@ export function DiscussionThread({
     const focalRef = useRef<HTMLLIElement>(null);
 
     // The thread renders in a fixed-height scroll box; the focal post can sit
-    // deep in a long thread, so scroll the box (not the page) to centre it —
-    // otherwise the panel lands on the thread tail and the facilitator sees
-    // the wrong message. With duplicate focal texts the last <li> wins the
-    // ref, matching renderThreadContext's last-match choice.
+    // deep in a long thread, so scroll the box (not the page) to centre it.
+    // Otherwise the panel lands on the thread tail and shows the wrong message.
+    // With duplicate focal texts the last <li> wins the ref, matching
+    // renderThreadContext's last-match choice.
     useEffect(() => {
         const ol = olRef.current;
         const li = focalRef.current;
