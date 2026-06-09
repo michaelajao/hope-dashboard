@@ -1,17 +1,4 @@
-/*
- * `source(none)` disables Tailwind v4's automatic source detection, and the
- * explicit `@source` scopes class scanning to this project's `src/` only.
- *
- * Why: Next 16 / Tailwind v4 was inferring the base directory as the PARENT
- * folder (`Documents/GitHub`) instead of this project. Auto-detection then
- * tried to scan every sibling repo there (comment_generation, engagement_ml,
- * HOPE-MOVE, textEngagement — ~1.8 GB) including their node_modules, which
- * pinned RAM and disk to 100% on `npm run dev`. Scoping to `src/` fixes it.
- * All app code lives under src/; the only Tailwind usage outside it is a
- * static doc mockup (docs/prototype/components.jsx) that the app never builds.
- */
-@import "tailwindcss" source(none);
-@source "../";
+@import "tailwindcss";
 
 /*
  * Design tokens. oklch palette ported from the hope·move prototype

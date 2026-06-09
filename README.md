@@ -91,11 +91,13 @@ Notes:
   first request after switching to it is a slow cold load (then it's fine).
   All 9 adapters resolve.
 
-> **Heads-up — `npm run dev` RAM:** Tailwind v4's automatic source detection
-> must stay scoped to `src/` (see the `@source` line in
-> `src/app/globals.css`). Without that scope it roots at the parent
-> `Documents/GitHub` folder and crawls every sibling repo + their
-> `node_modules`, pinning RAM/disk to 100%. Don't revert that line.
+> **Requires Next ≥ 16.2.7 + Tailwind ≥ 4.3.0.** Earlier combos had a
+> Turbopack ↔ Tailwind v4 bug: Turbopack ran PostCSS without a `from`, so
+> Tailwind resolved its base as the *parent* folder, failed to resolve
+> `@import "tailwindcss"`, and crawled every sibling repo's `node_modules` —
+> pinning RAM/disk to 100% on `npm run dev`. Tailwind 4.3.0 fixed the base
+> fallback (uses `process.cwd()` when `from` is absent). Don't downgrade below
+> these versions.
 
 ### Auth
 
