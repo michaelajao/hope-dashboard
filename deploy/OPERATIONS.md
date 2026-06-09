@@ -11,10 +11,6 @@ For *why* the system is shaped this way, see [ARCHITECTURE.md](../ARCHITECTURE.m
 | **engagement_ml** | [`engagement_ml`](https://github.com/michaelajao/engagement_ml) | 8000 | `X-API-Key: $HOPE_RISK_API_KEY` | dropout risk: per-horizon RandomForest + Platt + TreeSHAP |
 | **comment_generation** | [`comment_generation`](https://github.com/michaelajao/comment_generation) | 8001 (8011 on Brosnan HPC — `:8001` is held by JupyterHub) | `X-HMAC-Signature` over raw body, key `$HOPE_API_SECRET` | persona reply drafting + memory + HITL |
 
-> Risk backend note: the production risk service is **engagement_ml**, not the
-> older `dropout_ml_v2`. The latter remains only as a research scaffold (τ-sweep
-> / detection-vs-forecast ablation in the paper); it is not deployed.
-
 Read endpoints (`/health`, `/version`, `/model/info`, `/admin/models`) are
 always open. Both services honour `HOPE_API_AUTH=disabled` to bypass app-layer
 auth for local smoke tests — never in production. When the services run as
