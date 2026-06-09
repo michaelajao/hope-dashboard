@@ -50,6 +50,52 @@ uvicorn service.main:app --port 8011
 uvicorn api.main:app --port 8000
 ```
 
+### Run against the HPC over an SSH tunnel (workshop setup)
+
+The comment-gen service runs on the **Brosnan HPC** (SSH alias `bronan`,
+reached via the `zeus` login node — see `~/.ssh/config`) on `:8011`, reading
+the retrained LoRA adapters straight from its `models/`. To drive it from the
+laptop dashboard, forward the port and point `COMMENT_GEN_URL` at the tunnel.
+
+`.env.local` is already set to `COMMENT_GEN_URL=http://localhost:8011`. Then,
+in **two terminals**:
+
+```bash
+# Terminal 1 — SSH tunnel (leave open for the whole session)
+ssh -N -L 8011:localhost:8011 bronan
+
+# Terminal 2 — dashboard
+cd hope-dashboard
+npm run dev                       # http://localhost:3000
+```
+
+Verify the tunnel reaches the service before presenting:
+
+```bash
+curl -s http://localhost:8011/health        # -> {"status":"healthy", "model_loaded":true, ...}
+curl -s http://localhost:8011/admin/models  # -> the 9-adapter roster the picker shows
+```
+
+Notes:
+
+- **The tunnel is per-terminal** — if you close Terminal 1 (or the laptop
+  sleeps/restarts), the dashboard's backend goes offline until you reopen it.
+- If `/health` fails, the HPC uvicorn may have stopped. Restart it on bronan:
+  ```bash
+  cd ~/Research/comment_generation
+  HOPE_API_AUTH=disabled \
+  HOPE_GEN_MODEL_ID=michaelajao/qwen3-4b-hope-forum-clean-lora \
+  uvicorn service.main:app --host 0.0.0.0 --port 8011
+  ```
+- In the model picker, **avoid "Qwen3 8B (forum)"** — its HF Hub repo isn't
+  published, so switching to it errors. The other 8 adapters work.
+
+> **Heads-up — `npm run dev` RAM:** Tailwind v4's automatic source detection
+> must stay scoped to `src/` (see the `@source` line in
+> `src/app/globals.css`). Without that scope it roots at the parent
+> `Documents/GitHub` folder and crawls every sibling repo + their
+> `node_modules`, pinning RAM/disk to 100%. Don't revert that line.
+
 ### Auth
 
 This dashboard uses NextAuth v5 with the **dev-allowlist Credentials
