@@ -1,6 +1,6 @@
 # Hope Facilitator System — architecture & API reference
 
-This doc is the "how the pieces fit together" map for the Hope facilitator-assist system. It complements [INTEGRATION.md](INTEGRATION.md) (platform integration recipe) and [deploy/APIS.md](deploy/APIS.md) (endpoint + ops reference) — read those for the *what to call when* and *how to deploy*. This doc is the *why it is shaped this way*.
+This doc is the "how the pieces fit together" map for the Hope facilitator-assist system. It complements [INTEGRATION.md](INTEGRATION.md) (platform integration recipe) and [deploy/OPERATIONS.md](deploy/OPERATIONS.md) (deploy + models + runbook) — read those for the *what to call when* and *how to deploy*. This doc is the *why it is shaped this way*.
 
 ---
 
@@ -15,7 +15,7 @@ Three services, no shared database, no synchronous chain:
              │  webhook / cron
              ▼
 ┌─────────────────────────┐    ┌───────────────────────────┐
-│  hope-dashboard         │───▶│  comment_generation       │  Qwen3-1.7B + LoRA on HF Space
+│  hope-dashboard         │───▶│  comment_generation       │  Qwen3-4B + LoRA (HF Space or HPC)
 │  (Next.js 16, Vercel)   │    │  FastAPI / port 8001      │  → drafts + memory + HITL
 │                         │    └───────────────────────────┘
 │  Server proxy layer     │    ┌───────────────────────────┐
@@ -128,7 +128,7 @@ POST /generate
   ├─ HopeGenerator.generate_personas(...)
   │    │ system: SYSTEM_INSTRUCTION (8 rules, see src/config.py)
   │    │ user:   participant_context + memory + engagement + post + persona_suffix
-  │    │ decode: Qwen3-1.7B + LoRA, 4-bit nf4 quant, sdpa attn, n-gram blocked
+  │    │ decode: Qwen3-4B + LoRA, 4-bit nf4 quant, sdpa attn, n-gram blocked
   │    │ post:   strip @mentions, fill [name] slot, collapse consecutive slots
   │
   ├─ output_filter.filter_output(...)  ← per draft: MI policy, score open-question / reflection / prescriptive density
@@ -143,8 +143,8 @@ POST /generate
 
 `HOPE_GEN_MODEL_ID` (env var) selects which LoRA loads. Three forms:
 
-- HF Hub id with slash: `michaelajao/qwen3-1.7b-hope-only-lora` → `snapshot_download` + cache to `/data/.cache/huggingface`
-- Local registry id (no slash): `qwen3-1.7b-hope-only` → look up `MODEL_ID_TO_DIR` in [generation_service.py](../comment_generation/service/generation_service.py) → `models/<dir>/`
+- HF Hub id with slash: `michaelajao/qwen3-4b-hope-forum-clean-lora` → `snapshot_download` + cache to `/data/.cache/huggingface`
+- Local registry id (no slash): `qwen3-4b-hope-only` → look up `MODEL_ID_TO_DIR` in [generation_service.py](../comment_generation/service/generation_service.py) → `models/<dir>/`
 - Anything else: error at startup
 
 LoRA weights download once on first `/generate`; subsequent requests reuse the in-memory model. Cold-boot is ~30–90s on T4 (base download dominates); warm is sub-second.
@@ -325,8 +325,8 @@ Full reference: [comment_generation/docs/openapi.yaml](../comment_generation/doc
 | Cohort bundle | `local/iih-coh*.json` (gitignored) | dashboard | extracted by [`scripts/extract-iih-cohort.mjs`](scripts/extract-iih-cohort.mjs) from raw txt exports; pre-de-identified |
 | Memory store | `/app/outputs/memory.sqlite` | comment_generation | created on first connect via `CREATE TABLE IF NOT EXISTS`; persistent on `/data` for HF Space |
 | HITL store | `/app/outputs/hitl.sqlite` | comment_generation | same lifecycle as memory; sole source for DPO/KTO training data |
-| LoRA adapter | `michaelajao/qwen3-1.7b-hope-only-lora` | HF Hub (private) | swappable via `HOPE_GEN_MODEL_ID`; downloads to HF cache on first use |
-| Base model | `Qwen/Qwen3-1.7B` | HF Hub (public) | downloaded by `transformers.from_pretrained` |
+| LoRA adapter | `michaelajao/qwen3-4b-hope-forum-clean-lora` (default) | HF Hub (private) | swappable via `HOPE_GEN_MODEL_ID` / picker; downloads to HF cache on first use. Full roster in [deploy/OPERATIONS.md](deploy/OPERATIONS.md) §2 |
+| Base model | `Qwen/Qwen3-4B` | HF Hub (public) | downloaded by `transformers.from_pretrained` |
 | Dropout models | `engagement_ml/models/winner_T{7..42}.pkl` | engagement_ml | per-horizon RandomForest; Platt calibration files alongside |
 | Engagement panel | `cumulative_features_panel.parquet` | engagement_ml | optional; comment_generation falls back to request-body engagement when missing |
 
@@ -395,8 +395,7 @@ Each layer is independently scalable. The dashboard is stateless. comment_genera
 ## Index of related docs
 
 - [INTEGRATION.md](INTEGRATION.md) — for platform engineers integrating Hope Move with the two backing services
-- [deploy/APIS.md](deploy/APIS.md) — endpoint reference + ops + smoke tests
-- [deploy/MODELS.md](deploy/MODELS.md) — model versions, swapping procedure
+- [deploy/OPERATIONS.md](deploy/OPERATIONS.md) — deploy paths, model roster + swap/retrain, runbook
 - [deploy/azure/README.md](deploy/azure/README.md) — Azure topology
 - [comment_generation/docs/openapi.yaml](../comment_generation/docs/openapi.yaml) — authoritative OpenAPI spec
 - [comment_generation/space/README.md](../comment_generation/space/README.md) — HF Space deployment specifics

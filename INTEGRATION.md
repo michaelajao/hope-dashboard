@@ -7,7 +7,7 @@ Two services. Independent. Stateless from the platform's perspective.
 | Service | Repo | Default port | Purpose |
 | --- | --- | --- | --- |
 | **engagement_ml** | [`engagement_ml`](https://github.com/michaelajao/engagement_ml) | 8000 | Dropout-risk prediction. Random Forest + Platt calibration + TreeSHAP. |
-| **comment_generation** | [`comment_generation`](https://github.com/michaelajao/comment_generation) | 8001 | Persona-conditioned reply drafting (3 drafts per call). Holds memory of past posts + HITL log. |
+| **comment_generation** | [`comment_generation`](https://github.com/michaelajao/comment_generation) | 8001 | Persona-conditioned reply drafting (2–3 drafts for activity posts, 1 for forum/Discussion replies). Holds memory of past posts + HITL log. |
 
 ---
 
@@ -327,7 +327,7 @@ engagement_ml ships its model bundle (~50 MB, all `winner_T{T}.pkl` files) insid
 | `HOPE_RISK_API_KEY` | engagement_ml | 32-byte hex API key for X-API-Key auth |
 | `HOPE_API_SECRET` | comment-gen | 32-byte hex secret for HMAC auth |
 | `HF_TOKEN` | comment-gen | HF read token; only needed if the configured adapter is in a private repo |
-| `HOPE_GEN_MODEL_ID` | comment-gen | Which fine-tuned adapter to load. Default: `michaelajao/qwen3-4b-hope-only-lora` |
+| `HOPE_GEN_MODEL_ID` | comment-gen | Which fine-tuned adapter to load. Default: `michaelajao/qwen3-4b-hope-forum-clean-lora` |
 | `HOPE_DROPOUT_URL` | comment-gen | Optional. URL of engagement_ml's `/predict` for the engagement-aware prompt path. Set to your risk-API base URL |
 
 ---

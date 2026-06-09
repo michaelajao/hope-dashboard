@@ -6,7 +6,7 @@ Talks to two backends:
 
 - `comment_generation` FastAPI on `:8001` — three-persona draft generation,
   participant memory store, HITL signal capture.
-- `dropout_ml_v2` FastAPI on `:8000` — weekly dropout-risk scoring and
+- `engagement_ml` FastAPI on `:8000` — weekly dropout-risk scoring and
   engagement features.
 
 ## Stack
@@ -46,7 +46,7 @@ HOPE_API_AUTH=disabled \
 HOPE_GEN_MODEL_ID=qwen3-4b-hope-only \
 uvicorn service.main:app --port 8011
 
-# in dropout_ml_v2/deploy/
+# in engagement_ml/deploy/
 uvicorn api.main:app --port 8000
 ```
 

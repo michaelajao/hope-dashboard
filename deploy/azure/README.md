@@ -69,7 +69,7 @@ az acr create -n <ACR_NAME> -g hope-rg --sku Basic
 
 azd init -e dev   # creates .azure/dev/.env
 azd env set ACR_NAME <ACR_NAME>
-azd env set HOPE_GEN_MODEL_ID qwen2.5-1.5b-hope-only
+azd env set HOPE_GEN_MODEL_ID michaelajao/qwen3-4b-hope-forum-clean-lora
 ```
 
 ## Deploy
@@ -88,7 +88,7 @@ To run Qwen3-4B at production latency, change `containerapp-comment-gen.bicep`:
 1. Add a GPU workload profile to `main.bicep` `Microsoft.App/managedEnvironments` (e.g. `NC24-A100`).
 2. Set the comment-api container's `workloadProfileName` to that profile.
 3. Bump `resources.cpu` and `resources.memory`.
-4. Flip `HOPE_GEN_MODEL_ID=qwen3-4b-hope-ed25` env var.
+4. Flip `HOPE_GEN_MODEL_ID=michaelajao/qwen3-4b-hope-forum-clean-lora` env var.
 
 Restart the revision; no re-upload of adapters needed if both adapters are on the same Files share.
 
