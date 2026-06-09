@@ -113,6 +113,19 @@ function snippet(e: EventRecord, max = 120): string | null {
     return text.slice(0, max - 1) + "…";
 }
 
+/** A reply-draftable post: a content-carrying activity or forum/discussion
+ * post. Emotions activities are excluded (no training pairs — /generate
+ * 422s), matching the drafts.tsx target filter. Used to decide which
+ * timeline rows are clickable to set the Drafts panel's target post. */
+function isDraftablePost(e: EventRecord): boolean {
+    return (
+        (e.event_type === "activity" || e.event_type === "discussion_post") &&
+        typeof e.description === "string" &&
+        e.description.trim().length > 0 &&
+        e.activity_type !== "Emotions"
+    );
+}
+
 /** One-line narrative for the compact mode. Combines the event label
  * with a short snippet for content-carrying events; for logins the
  * most-recent one becomes "Last login" so the row reads naturally. */
@@ -160,6 +173,91 @@ function bucketEvents(events: EventRecord[], now: Date): DayBucket[] {
 
     return Array.from(buckets.values()).filter(
         (b) => b.events.length > 0 || b.pageVisitCount > 0,
+    );
+}
+
+/** One event row in the expanded "Full history" feed. Post rows (draftable
+ * activities + forum/discussion posts) are clickable to set the Drafts
+ * panel's target, mirroring the compact view; everything else renders as a
+ * static row. Extracted so the inline JSX isn't a lexical child of the
+ * <ul> (keeps the list-children lint rule happy). */
+function ExpandedEventRow({
+    event: e,
+    draftedTs,
+    onSelect,
+}: {
+    event: EventRecord;
+    draftedTs: string | undefined;
+    onSelect: (ts: string) => void;
+}) {
+    const Icon = ICONS[e.event_type] ?? Activity;
+    const accent = ACCENTS[e.event_type] ?? ACCENTS.login;
+    const text = snippet(e);
+    const isEmotions =
+        e.event_type === "activity" && e.activity_type === "Emotions";
+    const isPost = isDraftablePost(e);
+    const isDrafted = isPost && e.timestamp === draftedTs;
+
+    const row = (
+        <div className="flex w-full gap-2.5">
+            <div
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${accent}`}
+            >
+                <Icon className="h-3.5 w-3.5" aria-hidden />
+            </div>
+            <div className="min-w-0 flex-1">
+                <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-sm text-text">{eventLabel(e)}</span>
+                    <span className="flex shrink-0 items-center gap-1.5">
+                        {isDrafted && (
+                            <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[10px] font-medium text-accent-ink">
+                                drafting
+                            </span>
+                        )}
+                        {isEmotions && (
+                            <span
+                                className="rounded-full bg-surface-2 px-2 py-0.5 text-[10px] font-medium text-muted"
+                                title="Emotions posts are not AI-drafted — they call for a human reflection."
+                            >
+                                no AI draft
+                            </span>
+                        )}
+                        <span className="text-xs text-muted">
+                            {timeOnly(new Date(e.timestamp))}
+                        </span>
+                    </span>
+                </div>
+                {text && (
+                    <p className="mt-0.5 line-clamp-2 text-xs text-text-2">
+                        {text}
+                    </p>
+                )}
+            </div>
+        </div>
+    );
+
+    return (
+        <li
+            className={`rounded-md border ${
+                isDrafted
+                    ? "border-accent bg-accent/10"
+                    : "border-border bg-surface-2"
+            }`}
+        >
+            {isPost ? (
+                <button
+                    type="button"
+                    onClick={() => onSelect(e.timestamp)}
+                    className="flex w-full rounded-md px-2.5 py-2 text-left transition-colors hover:bg-accent/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                    aria-current={isDrafted ? "true" : undefined}
+                    title="Draft a reply to this post"
+                >
+                    {row}
+                </button>
+            ) : (
+                <div className="flex px-2.5 py-2">{row}</div>
+            )}
+        </li>
     );
 }
 
@@ -333,44 +431,14 @@ export function ActivityTimeline({
                                 )}
                             </div>
                             <ul className="space-y-1.5">
-                                {b.events.map((e) => {
-                                    const Icon = ICONS[e.event_type] ?? Activity;
-                                    const accent =
-                                        ACCENTS[e.event_type] ?? ACCENTS.login;
-                                    const text = snippet(e);
-                                    return (
-                                        <li
-                                            key={e.timestamp + e.event_type}
-                                            className="flex gap-2.5 rounded-md border border-border bg-surface-2 px-2.5 py-2"
-                                        >
-                                            <div
-                                                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${accent}`}
-                                            >
-                                                <Icon
-                                                    className="h-3.5 w-3.5"
-                                                    aria-hidden
-                                                />
-                                            </div>
-                                            <div className="min-w-0 flex-1">
-                                                <div className="flex items-baseline justify-between gap-2">
-                                                    <span className="text-sm text-text">
-                                                        {eventLabel(e)}
-                                                    </span>
-                                                    <span className="shrink-0 text-xs text-muted">
-                                                        {timeOnly(
-                                                            new Date(e.timestamp),
-                                                        )}
-                                                    </span>
-                                                </div>
-                                                {text && (
-                                                    <p className="mt-0.5 line-clamp-2 text-xs text-text-2">
-                                                        {text}
-                                                    </p>
-                                                )}
-                                            </div>
-                                        </li>
-                                    );
-                                })}
+                                {b.events.map((e) => (
+                                    <ExpandedEventRow
+                                        key={e.timestamp + e.event_type}
+                                        event={e}
+                                        draftedTs={draftedTs}
+                                        onSelect={selectPost}
+                                    />
+                                ))}
                             </ul>
                         </li>
                     ))}
