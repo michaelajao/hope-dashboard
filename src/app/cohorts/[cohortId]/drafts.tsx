@@ -15,7 +15,10 @@ import { EmptyState } from "@/components/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DraftCard, type DraftContext } from "@/components/draft-card";
 import { DiscussionThread } from "@/components/discussion-thread";
-import { FollowUpActivity } from "@/components/follow-up-activity";
+// Follow-up activity panel temporarily disabled — it surfaced participant
+// @-handles in the facilitator's past replies. Re-enable once those are
+// scrubbed/de-identified.
+// import { FollowUpActivity } from "@/components/follow-up-activity";
 import {
     useEvent,
     useGenerate,
@@ -604,12 +607,15 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                     );
                 })()}
             </CardContent>
+            {/* Follow-up activity panel temporarily disabled (showed participant
+                @-handles in past replies). Re-enable once de-identified:
             <div className="px-6 pb-6">
                 <FollowUpActivity
                     participantId={selectedId}
                     cohortId={cohort.id}
                 />
             </div>
+            */}
         </Card>
     );
 }

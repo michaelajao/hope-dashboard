@@ -1,4 +1,4 @@
-import { Activity, HandHeart, Lightbulb } from "lucide-react";
+import { Activity, ArrowRight, HandHeart, Lightbulb } from "lucide-react";
 import type { ComponentType, SVGProps } from "react";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -29,12 +29,25 @@ type InfoCardProps = {
     iconTone: IconTone;
     label: string;
     title?: string;
-    body: string;
+    body?: string;
+    /** Rendered as a short, un-truncated checklist (used for the
+     * recommended-approach actions so each step stays readable). */
+    items?: string[];
+    /** Visually anchor the card — used for the actionable "approach". */
+    highlight?: boolean;
 };
 
-function InfoCard({ Icon, iconTone, label, title, body }: InfoCardProps) {
+function InfoCard({
+    Icon,
+    iconTone,
+    label,
+    title,
+    body,
+    items,
+    highlight,
+}: InfoCardProps) {
     return (
-        <Card>
+        <Card className={highlight ? "border-l-4 border-l-accent" : undefined}>
             <CardContent>
                 <div className="flex items-start gap-3">
                     <span
@@ -51,9 +64,27 @@ function InfoCard({ Icon, iconTone, label, title, body }: InfoCardProps) {
                                 {title}
                             </div>
                         )}
-                        <p className="mt-1 line-clamp-3 text-xs text-text-2">
-                            {body}
-                        </p>
+                        {body && (
+                            <p className="mt-1 text-xs leading-relaxed text-text-2">
+                                {body}
+                            </p>
+                        )}
+                        {items && items.length > 0 && (
+                            <ul className="mt-1.5 space-y-1.5">
+                                {items.map((it, i) => (
+                                    <li
+                                        key={i}
+                                        className="flex items-start gap-1.5 text-xs leading-relaxed text-text-2"
+                                    >
+                                        <ArrowRight
+                                            className="mt-0.5 h-3 w-3 shrink-0 text-accent-ink"
+                                            aria-hidden
+                                        />
+                                        <span>{it}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
                     </div>
                 </div>
             </CardContent>
@@ -66,9 +97,14 @@ export function InfoCardRow({ prediction }: InfoCardRowProps) {
         prediction.contributing_factors,
         prediction.risk_level,
     );
-    const approach =
-        prediction.recommended_actions?.slice(0, 2).join(" — ") ||
-        "Acknowledge their last contribution and invite one small next step.";
+    // Show the model's top 1–2 recommended actions as discrete steps rather
+    // than one run-on, truncated sentence — so the actual "what to do" is
+    // legible at a glance.
+    const actions = (prediction.recommended_actions ?? []).slice(0, 2);
+    const fallback = [
+        "Acknowledge their last contribution",
+        "Invite one small next step",
+    ];
 
     return (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -83,7 +119,8 @@ export function InfoCardRow({ prediction }: InfoCardRowProps) {
                 Icon={Lightbulb}
                 iconTone="warn"
                 label="Recommended approach"
-                body={approach}
+                items={actions.length ? actions : fallback}
+                highlight
             />
             <InfoCard
                 Icon={HandHeart}

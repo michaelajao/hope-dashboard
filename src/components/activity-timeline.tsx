@@ -326,12 +326,24 @@ export function ActivityTimeline({
         );
     }
 
+    // Collapsed by default: the activity feed can carry participant
+    // @-mentions / names in post + reply text, which facilitators shouldn't
+    // see at a glance. A disclosure (matching the "Engagement signals"
+    // pattern) keeps it one click away. The "Full history" toggle lives
+    // inside, for when it's open.
     return (
-        <div>
-            <div className="mb-2 flex items-baseline justify-between">
-                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">
-                    Recent activity
-                </h4>
+        <details className="group">
+            <summary className="flex cursor-pointer select-none items-center justify-between text-xs font-semibold uppercase tracking-wide text-muted">
+                Recent activity
+                <span className="text-[10px] text-muted/70 group-open:hidden">
+                    show
+                </span>
+                <span className="hidden text-[10px] text-muted/70 group-open:inline">
+                    hide
+                </span>
+            </summary>
+            <div className="mt-3">
+            <div className="mb-2 flex justify-end">
                 <button
                     type="button"
                     onClick={() => setExpanded((v) => !v)}
@@ -444,6 +456,7 @@ export function ActivityTimeline({
                     ))}
                 </ol>
             )}
-        </div>
+            </div>
+        </details>
     );
 }

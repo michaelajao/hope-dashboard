@@ -23,6 +23,19 @@ import {
  * like an A/B-comparison knob for the workshop demo, not a personal
  * preference.
  */
+/**
+ * Facilitator-facing label. The service tags each adapter with an internal
+ * training-corpus note — "(forum)", "(activities)", "(forum, experimental)" —
+ * which means nothing to a facilitator. Strip it so the picker shows just the
+ * model family + size (e.g. "Qwen3 4B").
+ */
+function cleanModelLabel(label: string): string {
+    return label
+        .replace(/\s*\((?:forum|activities)(?:,\s*experimental)?\)/gi, "")
+        .replace(/\s*\(experimental\)/gi, "")
+        .trim();
+}
+
 export function ModelPicker() {
     const models = useCommentGenModels();
     const switchModel = useSwitchCommentGenModel();
@@ -42,7 +55,7 @@ export function ModelPicker() {
 
     const busy = switchModel.isPending;
     const labelFor = (id: string) =>
-        options.find((o) => o.model_id === id)?.label ?? id;
+        cleanModelLabel(options.find((o) => o.model_id === id)?.label ?? id);
 
     return (
         <div className="flex items-center gap-2">
@@ -77,7 +90,7 @@ export function ModelPicker() {
                 )}
                 {options.map((o) => (
                     <option key={o.model_id} value={o.model_id}>
-                        {o.label}
+                        {cleanModelLabel(o.label)}
                     </option>
                 ))}
             </select>
