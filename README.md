@@ -87,8 +87,9 @@ Notes:
   HOPE_GEN_MODEL_ID=michaelajao/qwen3-4b-hope-forum-clean-lora \
   uvicorn service.main:app --host 0.0.0.0 --port 8011
   ```
-- In the model picker, **avoid "Qwen3 8B (forum)"** — its HF Hub repo isn't
-  published, so switching to it errors. The other 8 adapters work.
+- In the model picker, **"Qwen3 8B (forum)" is the heaviest** adapter — the
+  first request after switching to it is a slow cold load (then it's fine).
+  All 9 adapters resolve.
 
 > **Heads-up — `npm run dev` RAM:** Tailwind v4's automatic source detection
 > must stay scoped to `src/` (see the `@source` line in

@@ -65,7 +65,7 @@ resolvable by env but intentionally hidden from the picker.
 | `michaelajao/qwen3-4b-hope-only-v5-lora` | Qwen3 4B (activities) | activity posts only |
 | `michaelajao/qwen3-1.7b-hope-forum-clean-lora` | Qwen3 1.7B (forum) | forum + activities |
 | `michaelajao/qwen3-0.6b-hope-forum-clean-lora` | Qwen3 0.6B (forum) | economy; runs on CPU |
-| `michaelajao/qwen3-8b-hope-forum-clean-lora` | Qwen3 8B (forum) | ⚠️ Hub repo not published — selecting errors |
+| `michaelajao/qwen3-8b-hope-forum-clean-lora` | Qwen3 8B (forum) | heaviest; top-roster BERTScore. First request after a swap is a slow cold load |
 | `michaelajao/smollm3-3b-hope-only-lora` | SmolLM3 3B (activities) | cross-arch |
 | `michaelajao/llama-3.2-3b-instruct-hope-only-lora` | Llama 3.2 3B (activities) | cross-arch |
 | `michaelajao/qwen3.5-4b-hope-forum-lora` | Qwen3.5 4B (forum, experimental) | research artifact |
@@ -181,7 +181,6 @@ sqlite3 comment_generation/outputs/hitl.sqlite \
 | 401 from a `*.hf.space` host | missing/invalid `HF_TOKEN` (private-Space gateway) | set a read-scoped `HF_TOKEN` |
 | 404 on `/event` | `chosen_draft_id` not logged (service restarted between generate and event) | re-issue `/generate`, use the new ids |
 | 422 on `/generate` | Pydantic validation — missing `post_text`, bad `activity_type` (e.g. `Emotions`) | fix the payload per the response detail |
-| picker swap to "Qwen3 8B (forum)" fails | the 8B Hub repo isn't published | pick another adapter, or push the repo |
 | `dropout_api: unreachable` in `/health` | comment-gen can't reach `HOPE_DROPOUT_URL` | only affects engagement enrichment; risk panel reads engagement_ml directly |
 | `engagement_used: false` always | panel parquet missing / wrong `HOPE_DROPOUT_PANEL_PATH` | re-vendor the parquet; generation still works |
 | `memory_used: false` for a known participant | no memory rows for `(participant_id, cohort_id)` | backfill via `/memory/batch` or the backfill CLI |
