@@ -64,6 +64,7 @@ const FACILITATOR_ID = "demo-facilitator";
 import {
     classifyGenerateError,
     emailForDisengaged,
+    firstContactTemplate,
     formatModelLabel,
 } from "./drafts-helpers";
 
@@ -368,12 +369,29 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                 ) : (
                     <div className="rounded-md border border-border bg-surface-2 px-3 py-6 text-center">
                         <p className="text-sm font-medium text-text-2">
-                            Waiting for {firstName}&apos;s next post
+                            {firstName} hasn&apos;t posted yet
                         </p>
                         <p className="mt-1 text-xs text-muted">
-                            No activity in the current scoring window — drafts
-                            will appear here when {firstName} posts next.
+                            No activity in the current scoring window. For an
+                            at-risk participant, a warm first check-in is the
+                            highest-value early action — it&apos;s a
+                            dropout-lowering signal in the model.
                         </p>
+                        {!writeMode && (
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => setWriteMode(true)}
+                                className="mt-3 gap-1.5"
+                            >
+                                <Sparkles
+                                    className="h-3.5 w-3.5"
+                                    aria-hidden
+                                />
+                                Write a first check-in
+                            </Button>
+                        )}
                     </div>
                 )}
                 <div className="flex gap-2">
@@ -454,7 +472,13 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                     const blankDraft: Draft = {
                         persona: "Empathetic",
                         label: "Warm personal check-in",
-                        body: "",
+                        // No post to reply to → seed a warm first-contact
+                        // message the facilitator can edit (act on a silent
+                        // at-risk participant). With a post, start blank —
+                        // they're writing a custom reply to it.
+                        body: recentPost
+                            ? ""
+                            : firstContactTemplate(firstName),
                         draft_id: ("00000000-0000-0000-0000-" +
                             String(selectedId)
                                 .padStart(12, "0")

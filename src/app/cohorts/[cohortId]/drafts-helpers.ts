@@ -193,3 +193,26 @@ export function emailForDisengaged(
     if (riskLevel !== "high" && riskLevel !== "medium") return null;
     return placeholderEmail(participantId, cohortId);
 }
+
+/**
+ * Warm, low-pressure first-contact message for a participant who hasn't
+ * posted in the current scoring window. Seeds the "Write my own" editor so
+ * a facilitator can act on a silent at-risk participant rather than waiting
+ * for a post to AI-draft a reply to.
+ *
+ * Intentionally a static template, not model output: there's no post to
+ * condition on, and a proactive check-in should be the facilitator's own
+ * warmth. It mirrors the high-risk wellbeing cue — acknowledge, no pressure,
+ * let them set the pace — and is fully editable before sending. Making first
+ * contact (a facilitator comment in week 1) is itself a dropout-lowering
+ * signal in engagement_ml, so this is the high-value early action.
+ */
+export function firstContactTemplate(firstName: string | null): string {
+    const name = (firstName ?? "").trim() || "there";
+    return (
+        `Hi ${name}, I noticed it's been a little while since your last visit ` +
+        `to Hope, and I wanted to check in — no pressure at all. How have ` +
+        `things been? If anything's making it harder to get back to the ` +
+        `programme, I'm happy to help in whatever way works for you.`
+    );
+}

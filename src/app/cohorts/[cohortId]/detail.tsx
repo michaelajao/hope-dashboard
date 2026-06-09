@@ -13,6 +13,7 @@ import { Avatar } from "@/components/avatar";
 import { ActivityTimeline } from "@/components/activity-timeline";
 import { MetricGrid, MetricTile } from "@/components/metric-tile";
 import { DriverBars } from "@/components/driver-bars";
+import { InfoCardRow } from "@/components/info-card-row";
 import { useParticipantPrediction } from "@/lib/hooks/api";
 import { useCohortBundle } from "@/lib/hooks/useCohortBundle";
 import { bundleParticipantIds, bundleToHistory } from "@/lib/realCohort";
@@ -228,6 +229,14 @@ export function Detail({
                         </div>
                     ) : null}
                 </div>
+
+                {/* What to do: the model's recommended actions + wellbeing
+                    cue (keyed on risk level). Surfaces the engagement_ml
+                    `recommended_actions` playbook that was otherwise computed
+                    but never shown. */}
+                {prediction.data && (
+                    <InfoCardRow prediction={prediction.data} />
+                )}
 
                 {history && (
                     <details className="group" open>

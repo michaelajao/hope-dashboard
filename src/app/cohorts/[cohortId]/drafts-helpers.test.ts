@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
     classifyGenerateError,
     emailForDisengaged,
+    firstContactTemplate,
     formatModelLabel,
     placeholderEmail,
 } from "./drafts-helpers";
@@ -181,5 +182,22 @@ describe("emailForDisengaged", () => {
 
     it("returns null even for high-risk if participantId is missing", () => {
         expect(emailForDisengaged(null, 1680, "high")).toBeNull();
+    });
+});
+
+describe("firstContactTemplate", () => {
+    it("personalises the greeting with the first name", () => {
+        expect(firstContactTemplate("Kristy")).toContain("Hi Kristy,");
+    });
+
+    it("falls back to a neutral greeting when no name is available", () => {
+        expect(firstContactTemplate(null)).toContain("Hi there,");
+        expect(firstContactTemplate("  ")).toContain("Hi there,");
+    });
+
+    it("stays warm and low-pressure (no obligation language)", () => {
+        const msg = firstContactTemplate("Sam").toLowerCase();
+        expect(msg).toContain("no pressure");
+        expect(msg).toContain("check in");
     });
 });
