@@ -13,7 +13,7 @@ the AI reply** while facilitators score it on the rating sheets
    `ssh -N -L 8011:localhost:8011 bronan`
 2. **Dashboard is running:** `npm run dev`, then open `http://localhost:3000`.
 3. **Set the model** to match the printed pack: in the top bar **Model** picker,
-   choose **"Qwen3 4B (forum)"**. (The printed replies were made with a 4B forum
+   choose **"Qwen3 4B"**. (The printed replies were made with the 4B forum
    model; this keeps the live replies close. The picker setting is shared, so set
    it once.)
 4. **Have the pack ready:** print or open `model_examples.pdf` and the rating

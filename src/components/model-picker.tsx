@@ -36,6 +36,32 @@ function cleanModelLabel(label: string): string {
         .trim();
 }
 
+/**
+ * Map each adapter id to its display label. Labels are cleaned (no corpus
+ * jargon) — but two distinct adapters can clean to the SAME name (e.g. the
+ * 4B "(forum)" keeper and the 4B "(activities)" model both → "Qwen3 4B"),
+ * which would show two identical picker entries. On collision, keep the
+ * corpus tag back so each option is distinguishable.
+ */
+function buildLabelMap(
+    options: { model_id: string; label: string }[],
+): Map<string, string> {
+    const cleaned = options.map((o) => cleanModelLabel(o.label));
+    const counts = new Map<string, number>();
+    for (const c of cleaned) counts.set(c, (counts.get(c) ?? 0) + 1);
+    const map = new Map<string, string>();
+    options.forEach((o, i) => {
+        const base = cleaned[i];
+        if ((counts.get(base) ?? 0) > 1) {
+            const tag = o.label.match(/\((?:forum|activities)[^)]*\)/i)?.[0];
+            map.set(o.model_id, tag ? `${base} ${tag}` : o.label);
+        } else {
+            map.set(o.model_id, base);
+        }
+    });
+    return map;
+}
+
 export function ModelPicker() {
     const models = useCommentGenModels();
     const switchModel = useSwitchCommentGenModel();
@@ -54,8 +80,8 @@ export function ModelPicker() {
     }
 
     const busy = switchModel.isPending;
-    const labelFor = (id: string) =>
-        cleanModelLabel(options.find((o) => o.model_id === id)?.label ?? id);
+    const labelMap = buildLabelMap(options);
+    const labelFor = (id: string) => labelMap.get(id) ?? cleanModelLabel(id);
 
     return (
         <div className="flex items-center gap-2">
@@ -90,7 +116,7 @@ export function ModelPicker() {
                 )}
                 {options.map((o) => (
                     <option key={o.model_id} value={o.model_id}>
-                        {cleanModelLabel(o.label)}
+                        {labelMap.get(o.model_id) ?? cleanModelLabel(o.label)}
                     </option>
                 ))}
             </select>
