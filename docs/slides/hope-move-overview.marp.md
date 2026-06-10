@@ -144,7 +144,7 @@ section.fig h2 { font-size: 30px; margin-bottom: 12px; }
 <div class="arch">
   <div class="node"><div class="h">Hope platform</div><div class="d">cohorts · posts · replies</div></div>
   <div class="arrow">→</div>
-  <div class="node dash"><div class="h">The dashboard</div><div class="d">what you use</div></div>
+  <div class="node dash"><div class="h">The dashboard</div><div class="d">which you use</div></div>
   <div class="arrow">→</div>
   <div class="stack">
     <div class="node engine"><div class="h">Risk engine</div><div class="d">who needs attention + why</div><div class="how">A prediction model that learns from past cohorts' weekly activity — it spots the early signs of someone slipping away, and shows the reasons.</div></div>
@@ -153,24 +153,6 @@ section.fig h2 { font-size: 30px; margin-bottom: 12px; }
 </div>
 
 <p class="archnote">Everything runs on secure, private systems · personal details are removed · nothing is sent without you.</p>
-
----
-
-<!-- _class: fig -->
-
-## How it fits together — the full picture
-
-![h:560](assets/architecture.png)
-
-<p class="tiny">The detailed view (for reference): the platform · the dashboard · the two AI services — with where data is kept and how it's secured.</p>
-
----
-
-## The dashboard at a glance
-
-![w:1000](assets/dashboard.jpeg)
-
-<p class="tiny">Three panels — <strong>who needs attention</strong> (left) · <strong>why</strong> (middle) · <strong>a ready-to-send reply</strong> (right).</p>
 
 ---
 
@@ -199,3 +181,13 @@ section.fig h2 { font-size: 30px; margin-bottom: 12px; }
 - The **draft replies** come from a small, fine-tuned **AI language model**, trained on real *(anonymised)* Hope facilitator replies — so it sounds like the programme, not a generic chatbot.
 - The **risk score** comes from a **Random Forest** model — a well-established machine-learning method. It treats early drop-out as a **classification problem**: from each participant's weekly activity, how likely are they to disengage? Validated on past cohorts (about **0.94** accuracy).
 - Both produce **suggestions only** — your judgement always leads.
+
+---
+
+<!-- _class: fig -->
+
+## How it fits together — the full picture
+
+![h:560](assets/architecture.png)
+
+<p class="tiny">The detailed view (for reference): the platform · the dashboard · the two AI services — with where data is kept and how it's secured.</p>

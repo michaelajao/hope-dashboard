@@ -25,9 +25,15 @@ export default function RootLayout({
     children: React.ReactNode;
 }>) {
     return (
+        // suppressHydrationWarning: browser extensions (e.g. SwiftRead) and
+        // theme scripts mutate <html> attributes/style before React hydrates,
+        // which otherwise trips a hydration mismatch. This suppresses the
+        // warning for this element's own attributes only (one level deep) —
+        // it does NOT hide mismatches in the tree below.
         <html
             lang="en"
             className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+            suppressHydrationWarning
         >
             <body className="min-h-full flex flex-col bg-slate-50 text-slate-900">
                 <Providers>{children}</Providers>

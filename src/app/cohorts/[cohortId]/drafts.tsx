@@ -458,11 +458,27 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                     );
                 })()}
 
-                {generate.isPending && (
-                    <div className="space-y-3">
+                {/* Skeletons only on the FIRST generation (no response yet).
+                    During a regenerate the existing DraftCard stays mounted and
+                    shows its own spinning refresh icon — rendering skeletons too
+                    would double up (3 shimmer blocks pushing the old card down).
+                    role=status + sr-only text announces the wait to screen
+                    readers, which the bare skeletons wouldn't. */}
+                {generate.isPending && !response && (
+                    <div
+                        className="space-y-3"
+                        role="status"
+                        aria-busy="true"
+                        aria-live="polite"
+                    >
+                        <span className="sr-only">Generating drafts…</span>
                         {[0, 1, 2].map((i) => (
                             <Skeleton key={i} className="h-32 w-full" />
                         ))}
+                        <p className="text-center text-xs text-muted">
+                            Drafting with the AI model — the first run after a
+                            model switch can take ~30s.
+                        </p>
                     </div>
                 )}
 
