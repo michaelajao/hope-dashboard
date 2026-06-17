@@ -66,7 +66,6 @@ const FACILITATOR_ID = "demo-facilitator";
 // them in a Node environment without dragging in the React/Next tree.
 import {
     classifyGenerateError,
-    emailForDisengaged,
     firstContactTemplate,
     formatModelLabel,
 } from "./drafts-helpers";
@@ -277,40 +276,9 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
         });
     }
 
-    // HITL signals: reject + flag. Both fire /event with the same
-    // draft_set_id so comment-gen's DPO / KTO pipelines can join the
-    // shown drafts with the facilitator's decision. Reject = "none of
-    // these worked"; Flag = "this one is broken in a specific way"
-    // (reason carries the canned-category + optional notes).
-    function onReject(draftId: string) {
-        if (!response) return;
-        event.mutate({
-            draft_set_id: response.draft_set_id,
-            chosen_draft_id: draftId,
-            action: "reject",
-            facilitator_id: FACILITATOR_ID,
-        });
-    }
-
-    function onFlag(draftId: string, reason: string) {
-        if (!response) return;
-        event.mutate({
-            draft_set_id: response.draft_set_id,
-            chosen_draft_id: draftId,
-            action: "flag",
-            flag_reason: reason,
-            facilitator_id: FACILITATOR_ID,
-        });
-    }
-
     const profile = getProfile(selectedId, bundle.data ?? null);
     const displayName = profile.displayName;
     const firstName = displayName.split(/\s+/)[0] ?? displayName;
-    const recipientEmail = emailForDisengaged(
-        selectedId,
-        cohort.id,
-        prediction.data?.risk_level,
-    );
 
     return (
         <Card className="flex flex-col">
@@ -532,7 +500,6 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                                 pending={event.isPending}
                                 context={ctx}
                                 recipientName={displayName}
-                                recipientEmail={recipientEmail}
                                 participantId={Number(
                                     String(selectedId).replace(/[^0-9]/g, "") ||
                                         "0",
@@ -607,14 +574,11 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
                                 draft={current}
                                 onThumb={onThumb}
                                 onSend={onSend}
-                                onReject={onReject}
-                                onFlag={onFlag}
                                 onRegenerate={onGenerate}
                                 regenerating={generate.isPending}
                                 pending={event.isPending}
                                 context={ctx}
                                 recipientName={displayName}
-                                recipientEmail={recipientEmail}
                                 participantId={Number(
                                     String(selectedId).replace(/[^0-9]/g, "") || "0",
                                 )}

@@ -1,19 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useState } from "react";
 import {
-    Flag,
     Info,
     Loader2,
-    Mail,
-    MoreVertical,
     RefreshCcw,
     Send,
     Sparkles,
     ThumbsDown,
     ThumbsUp,
     Wand2,
-    X,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -41,8 +37,7 @@ import type { Draft } from "@/lib/api/commentGen";
  *  - Refresh icon at bottom-left → triggers regenerate via onRegenerate
  *  - Char counter next to it
  *  - Draft-quality feedback (👍/👎) is inline in the footer with a visible
- *    "Helpful?" prompt. The kebab keeps the rarer actions (send by email,
- *    reject, flag for review).
+ *    "Helpful?" prompt.
  *  - "What this draft is based on" disclosure stays below
  */
 
@@ -59,8 +54,6 @@ type DraftCardProps = {
     draft: Draft;
     onThumb: (draftId: string, label: "up" | "down") => void;
     onSend: (draftId: string, sentText: string, action: "accept" | "edit") => void;
-    onReject?: (draftId: string) => void;
-    onFlag?: (draftId: string, reason: string) => void;
     onRegenerate?: () => void;
     regenerating?: boolean;
     pending?: boolean;
@@ -68,10 +61,6 @@ type DraftCardProps = {
     /** Used in the "To: …" header. Falls back to "the participant" when
      *  the caller doesn't have a name. */
     recipientName?: string;
-    /** Optional email address for the "Send by email" action. When set,
-     *  the kebab exposes a mailto: shortcut that prefills the current
-     *  (edited) draft text. null/undefined hides the action. */
-    recipientEmail?: string | null;
     /** Participant id for the Polish action (passed straight through to
      *  the comment-gen /text/polish endpoint). When omitted the Polish
      *  button is hidden — polish is a participant-scoped request. */
@@ -84,14 +73,6 @@ type DraftCardProps = {
 // linger in a stale state forever.
 const POLISH_UNDO_MS = 10_000;
 
-const FLAG_REASONS = [
-    { id: "off-tone", label: "Off-tone or patronising" },
-    { id: "factually-wrong", label: "Factually wrong" },
-    { id: "unsafe", label: "Unsafe / triggering" },
-    { id: "wrong-persona", label: "Wrong persona for this participant" },
-    { id: "other", label: "Other — see notes" },
-] as const;
-
 function isPersonalised(ctx: DraftContext): boolean {
     // Memory retrieval is the personalisation signal we trust — it
     // means the SLM had prior posts in its prompt. Profile bios used to
@@ -103,24 +84,16 @@ export function DraftCard({
     draft,
     onThumb,
     onSend,
-    onReject,
-    onFlag,
     onRegenerate,
     regenerating,
     pending,
     context,
     recipientName,
-    recipientEmail,
     participantId,
 }: DraftCardProps) {
     const [text, setText] = useState(draft.body);
     const [edited, setEdited] = useState(false);
     const [thumb, setThumb] = useState<"up" | "down" | null>(null);
-    const [menuOpen, setMenuOpen] = useState(false);
-    const [flagging, setFlagging] = useState(false);
-    const [flagReason, setFlagReason] = useState<string>(FLAG_REASONS[0].id);
-    const [flagNotes, setFlagNotes] = useState("");
-    const [rejected, setRejected] = useState(false);
 
     // Polish-with-AI state. `polishShadow` holds the pre-polish text so a
     // facilitator can roll back if the rephrased version isn't what they
@@ -135,22 +108,6 @@ export function DraftCard({
     // the active persona changes or a new generation lands. useState
     // initialisers fire fresh on each mount, so state naturally resets
     // — no cascading-render anti-pattern required.
-
-    // Close the kebab menu when clicking outside.
-    const menuRef = useRef<HTMLDivElement>(null);
-    useEffect(() => {
-        if (!menuOpen) return;
-        function onClick(e: MouseEvent) {
-            if (
-                menuRef.current &&
-                !menuRef.current.contains(e.target as Node)
-            ) {
-                setMenuOpen(false);
-            }
-        }
-        document.addEventListener("mousedown", onClick);
-        return () => document.removeEventListener("mousedown", onClick);
-    }, [menuOpen]);
 
     // Auto-expire the "Restore my original" affordance after
     // POLISH_UNDO_MS so it doesn't linger forever.
@@ -194,25 +151,6 @@ export function DraftCard({
     function clickThumb(label: "up" | "down") {
         setThumb(label);
         onThumb(String(draft.draft_id), label);
-        setMenuOpen(false);
-    }
-
-    function submitFlag(e: FormEvent) {
-        e.preventDefault();
-        const reasonLabel =
-            FLAG_REASONS.find((r) => r.id === flagReason)?.label ?? flagReason;
-        const composed = flagNotes.trim()
-            ? `${reasonLabel}: ${flagNotes.trim()}`
-            : reasonLabel;
-        onFlag?.(String(draft.draft_id), composed);
-        setFlagging(false);
-        setFlagNotes("");
-    }
-
-    function clickReject() {
-        onReject?.(String(draft.draft_id));
-        setRejected(true);
-        setMenuOpen(false);
     }
 
     function clickSend() {
@@ -220,34 +158,8 @@ export function DraftCard({
         onSend(String(draft.draft_id), text, action);
     }
 
-    function clickEmail() {
-        if (!recipientEmail) return;
-        // Open the facilitator's default mail client with the current
-        // (possibly edited) draft text prefilled. We deliberately do NOT
-        // route this through onSend — the email isn't sent yet, the
-        // facilitator still has to hit Send in their mail app.
-        const subject = "Checking in from your Hope facilitator";
-        const url = `mailto:${encodeURIComponent(recipientEmail)}?subject=${encodeURIComponent(
-            subject,
-        )}&body=${encodeURIComponent(text)}`;
-        window.location.href = url;
-        setMenuOpen(false);
-    }
-
     const toName = recipientName ?? context?.displayName ?? "the participant";
     const chars = text.length;
-    // Only show the kebab when it has at least one action; an empty popover
-    // would otherwise open. (Thumb up/down moved inline to the footer.)
-    const hasMenuActions =
-        Boolean(recipientEmail) || Boolean(onReject) || Boolean(onFlag);
-
-    if (rejected) {
-        return (
-            <div className="overflow-hidden rounded-lg border border-border bg-surface-2 px-3 py-2.5 text-sm text-muted opacity-60">
-                {draft.label} — rejected. Signal logged.
-            </div>
-        );
-    }
 
     return (
         <div className="space-y-3">
@@ -391,72 +303,6 @@ export function DraftCard({
                         >
                             <ThumbsDown className="h-3.5 w-3.5" />
                         </Button>
-                        {hasMenuActions && (
-                            <div className="relative" ref={menuRef}>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    aria-label="More actions"
-                                    aria-haspopup="menu"
-                                    aria-expanded={menuOpen}
-                                    onClick={() => setMenuOpen((v) => !v)}
-                                    disabled={pending}
-                                    className="h-7 w-7 text-muted hover:text-text-2"
-                                >
-                                    <MoreVertical className="h-4 w-4" />
-                                </Button>
-                            {menuOpen && (
-                                <div
-                                    role="menu"
-                                    // The kebab lives in the card's bottom
-                                    // footer, so a downward menu (mt-1) spills
-                                    // below the card and gets painted behind
-                                    // the next card. Open UPWARD over the
-                                    // card's own (taller) body, and lift above
-                                    // sibling cards with z-50.
-                                    className="absolute bottom-full right-0 z-50 mb-1 w-48 overflow-hidden rounded-md border border-border bg-surface shadow-md"
-                                >
-                                    {recipientEmail && (
-                                        <button
-                                            type="button"
-                                            role="menuitem"
-                                            onClick={clickEmail}
-                                            className="flex w-full items-center gap-2 border-b border-border px-3 py-2 text-left text-xs hover:bg-surface-2"
-                                            title={`Open mailto: ${recipientEmail}`}
-                                        >
-                                            <Mail className="h-3.5 w-3.5" />
-                                            Send by email
-                                        </button>
-                                    )}
-                                    {onReject && (
-                                        <button
-                                            type="button"
-                                            role="menuitem"
-                                            onClick={clickReject}
-                                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-muted hover:bg-surface-2 hover:text-risk-hi"
-                                        >
-                                            <X className="h-3.5 w-3.5" />
-                                            Reject draft
-                                        </button>
-                                    )}
-                                    {onFlag && (
-                                        <button
-                                            type="button"
-                                            role="menuitem"
-                                            onClick={() => {
-                                                setFlagging(true);
-                                                setMenuOpen(false);
-                                            }}
-                                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-muted hover:bg-surface-2 hover:text-risk-md"
-                                        >
-                                            <Flag className="h-3.5 w-3.5" />
-                                            Flag for review
-                                        </button>
-                                    )}
-                                </div>
-                            )}
-                            </div>
-                        )}
                         <Button
                             size="sm"
                             onClick={clickSend}
@@ -469,55 +315,6 @@ export function DraftCard({
                     </div>
                 </div>
             </div>
-
-            {flagging && (
-                <form
-                    onSubmit={submitFlag}
-                    className="space-y-2 rounded-md border border-risk-md bg-risk-md-bg p-3 text-xs"
-                >
-                    <label
-                        htmlFor={`flag-reason-${draft.draft_id}`}
-                        className="block font-medium text-text-2"
-                    >
-                        What&apos;s wrong with this draft?
-                    </label>
-                    <select
-                        id={`flag-reason-${draft.draft_id}`}
-                        value={flagReason}
-                        onChange={(e) => setFlagReason(e.target.value)}
-                        className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-xs text-text outline-none focus:border-accent focus:ring-2 focus:ring-accent-2"
-                    >
-                        {FLAG_REASONS.map((r) => (
-                            <option key={r.id} value={r.id}>
-                                {r.label}
-                            </option>
-                        ))}
-                    </select>
-                    <Textarea
-                        rows={2}
-                        value={flagNotes}
-                        onChange={(e) => setFlagNotes(e.target.value)}
-                        placeholder="Optional — specifics that would help training"
-                        className="text-xs"
-                    />
-                    <div className="flex justify-end gap-2">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            type="button"
-                            onClick={() => {
-                                setFlagging(false);
-                                setFlagNotes("");
-                            }}
-                        >
-                            Cancel
-                        </Button>
-                        <Button size="sm" type="submit" disabled={pending}>
-                            Submit flag
-                        </Button>
-                    </div>
-                </form>
-            )}
 
             {context && (
                 <details className="text-xs text-muted">
