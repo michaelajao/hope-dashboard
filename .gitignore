@@ -63,3 +63,9 @@ final2-*.png
 cohort-*.png
 hope-move dashboard.zip
 docs/plan.md
+
+# Slide deck (build_pptx.py) build + temp artifacts
+docs/slides/.render/
+docs/slides/.devserver.log
+docs/slides/assets/.build_norm/
+~$*.pptx
