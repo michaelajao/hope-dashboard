@@ -28,24 +28,78 @@ Three ways the backends run. The dashboard only follows `COMMENT_GEN_URL` /
 | Path | When | Reference |
 | --- | --- | --- |
 | **HF Space** (Docker SDK, private) | shareable always-on endpoint | [`comment_generation/space/DEPLOY.md`](../../comment_generation/space/DEPLOY.md) — authoritative |
-| **HPC + SSH tunnel** | freshest weights, no Space rebuild; demo/dev | [README → "Run against the HPC"](../README.md) |
-| **Azure Container Apps** | aspirational; never deployed | [`deploy/azure/README.md`](azure/README.md) |
+| **Self-host via Docker Compose** | own hardware, one command | §1.1 below + [`docker-compose.yml`](../docker-compose.yml) |
+| **HPC + SSH tunnel** (maintainer-only) | freshest weights, no Space rebuild; demo/dev | §1.2 below |
 
-### HPC (current demo path)
+### 1.1 Self-host with Docker Compose
 
-The comment-gen service runs on **Brosnan** (`bronan` SSH alias) on `:8011`,
-reading adapters from its `models/` or pulling Hub ids into the HF cache:
+The whole stack from a clean machine. Needs Docker and sibling checkouts of
+`../comment_generation` and `../engagement_ml`.
+
+**Compute floors**
+
+| Service | Floor | Recommended |
+| --- | --- | --- |
+| engagement_ml | 2 vCPU / 1 GB RAM (CPU only) | 2 vCPU / 4 GB RAM |
+| comment_generation | 1× T4 (16 GB) — Qwen3-4B class in 4-bit | 1× A10G / A100 (24 GB+) for fp16 |
+
+**Get the model artefacts.** Neither repo commits its weights.
+
+```bash
+# engagement_ml — the six per-horizon bundles (~50 MB) go in models/:
+#   winner_T{7,14,21,28,35,42}.pkl   platt_T{...}.pkl
+#   feature_medians_T{...}.csv       feature_names_T{...}.csv
+#   model_card_T{...}.json
+# Copy them from the HF Space repo or the training box; the service
+# fail-fasts at startup if any are missing.
+ls ../engagement_ml/models/
+
+# comment_generation — adapters are pulled from the HF Hub on first
+# /generate call. Just pass a read-scoped HF_TOKEN; nothing to download
+# by hand.
+```
+
+**Run.**
+
+```bash
+cp .env.example .env              # fill HOPE_API_SECRET, HOPE_RISK_API_KEY, HF_TOKEN
+docker compose up --build         # dashboard :3000, comment :8001, risk :8000
+
+# No GPU? Real UI, canned drafts:
+HOPE_DISABLE_GENERATION=1 docker compose up --build
+```
+
+For a GPU, uncomment the `deploy:` block under `comment-api` in
+`docker-compose.yml` (needs the NVIDIA Container Toolkit).
+
+**Persistence.** comment_generation writes two SQLite files under
+`outputs/` (mounted by compose):
+
+- `memory.sqlite` — participant posts + facilitator replies. Rebuildable
+  from platform events via `/memory/batch`.
+- `hitl.sqlite` — facilitator HITL signals (thumbs, accept/edit/reject).
+  **Not rebuildable** — losing it loses training signal. Back it up daily.
+
+### 1.2 HPC + SSH tunnel (maintainer-only)
+
+Not part of the HOPE-MOVE handover — it needs Coventry HPC credentials.
+The comment service runs on **Brosnan** (`bronan` SSH alias, reached via
+the `zeus` login node) bound to `:8011` because `:8001` is held by
+JupyterHub there:
 
 ```bash
 # on bronan
 cd ~/Research/comment_generation
 HOPE_API_AUTH=disabled \
-HOPE_GEN_MODEL_ID=michaelajao/qwen3-4b-hope-forum-clean-lora \
+HOPE_GEN_MODEL_ID=michaelajao/qwen3.5-4b-hope-forum-lora \
 uvicorn service.main:app --host 0.0.0.0 --port 8011
 
 # on the laptop — forward the port, then point COMMENT_GEN_URL at it
 ssh -N -L 8011:localhost:8011 bronan
 ```
+
+The tunnel is per-terminal: close it (or sleep the laptop) and the
+backend goes offline until you reopen it.
 
 ---
 
@@ -61,15 +115,15 @@ resolvable by env but intentionally hidden from the picker.
 
 | `HOPE_GEN_MODEL_ID` (Hub id) | Picker label | Corpus |
 | --- | --- | --- |
-| `michaelajao/qwen3-4b-hope-forum-clean-lora` | Qwen3 4B (forum) | **Default.** Production keeper |
+| `michaelajao/qwen3.5-4b-hope-forum-lora` | Qwen3.5 4B (forum) | **Default.** Production selection (paper B_nlp, 2026-07) |
+| `michaelajao/qwen3-4b-hope-forum-clean-lora` | Qwen3 4B (forum) | previous keeper; ties the 8B on BERTScore at a third of the memory |
 | `michaelajao/qwen3-4b-hope-only-v5-lora` | Qwen3 4B (activities) | activity posts only |
 | `michaelajao/qwen3-1.7b-hope-forum-clean-lora` | Qwen3 1.7B (forum) | forum + activities |
 | `michaelajao/qwen3-0.6b-hope-forum-clean-lora` | Qwen3 0.6B (forum) | economy; runs on CPU |
 | `michaelajao/qwen3-8b-hope-forum-clean-lora` | Qwen3 8B (forum) | heaviest; top-roster BERTScore. First request after a swap is a slow cold load |
 | `michaelajao/smollm3-3b-hope-only-lora` | SmolLM3 3B (activities) | cross-arch |
 | `michaelajao/llama-3.2-3b-instruct-hope-only-lora` | Llama 3.2 3B (activities) | cross-arch |
-| `michaelajao/qwen3.5-4b-hope-forum-lora` | Qwen3.5 4B (forum, experimental) | research artifact |
-| `michaelajao/gemma-4-e4b-it-hope-forum-lora` | Gemma-4 E4B (forum, experimental) | research artifact; omits `[name]` slot |
+| `michaelajao/gemma-4-e4b-it-hope-forum-lora` | Gemma-4 E4B (forum) | cross-family; omits `[name]` slot |
 
 `/generate` returns **2–3 persona drafts** for activity posts (Gratitude → 2:
 Empathetic + Goal-oriented; others → 3) and **1 warm reply** for `Discussion`
@@ -134,7 +188,7 @@ absent, `/generate` returns `engagement_used: false` and proceeds.
 | `HOPE_API_AUTH` | both | `enabled` (prod) or `disabled` (local smoke) |
 | `HOPE_RISK_API_KEY` | engagement_ml | 32-byte hex `X-API-Key` |
 | `HOPE_API_SECRET` | comment-gen | 32-byte hex HMAC secret |
-| `HOPE_GEN_MODEL_ID` | comment-gen | adapter to load. Default `michaelajao/qwen3-4b-hope-forum-clean-lora` |
+| `HOPE_GEN_MODEL_ID` | comment-gen | adapter to load. Default `michaelajao/qwen3.5-4b-hope-forum-lora` |
 | `HF_TOKEN` | comment-gen | HF read token — needed to `snapshot_download` private adapters and to hit a private Space |
 | `HOPE_DROPOUT_URL` | comment-gen | optional; engagement_ml `/health` for the engagement-aware prompt path |
 | `HOPE_DROPOUT_PANEL_PATH` | comment-gen | optional; path to `cumulative_features_panel.parquet` |
@@ -142,7 +196,23 @@ absent, `/generate` returns `engagement_used: false` and proceeds.
 
 The dashboard's matching `.env.local` keys (`COMMENT_GEN_URL`, `DROPOUT_API_URL`,
 `HOPE_API_SECRET`, `HOPE_RISK_API_KEY`, `HF_TOKEN`) must align with whatever the
-services run with. See [README → Pointing at the backend](../README.md).
+services run with. See [README → Configuration](../README.md).
+
+Note the two names for the risk-service key: the dashboard sends
+`HOPE_RISK_API_KEY`, and engagement_ml reads it as `API_KEY`. Same value,
+different variable name on each side.
+
+### Generating and rotating secrets
+
+```bash
+openssl rand -hex 32   # HOPE_API_SECRET  (comment-gen HMAC)
+openssl rand -hex 32   # API_KEY          (engagement_ml X-API-Key)
+npx auth secret        # AUTH_SECRET      (dashboard NextAuth)
+```
+
+Neither service supports two acceptable values at once, so there is no
+dual-secret grace window: deploy a new secret to the service and every
+caller in lockstep, and plan brief downtime for the cutover.
 
 ---
 
@@ -151,14 +221,14 @@ services run with. See [README → Pointing at the backend](../README.md).
 ### Restart / reload
 
 - **HF Space:** Settings → Factory reboot (reloads adapter + re-reads env).
+- **Docker Compose:** `docker compose restart comment-api` (or `risk-api`).
 - **HPC:** stop and re-run the `uvicorn` command (§1).
-- **Azure (aspirational):** `az containerapp revision restart -n <app> -g <rg> --revision <name>`.
 
 ### Health & smoke
 
 ```bash
 curl -s http://localhost:8011/health        # comment-gen: {"status":"healthy","model_loaded":true,...}
-curl -s http://localhost:8011/version       # {"model_version":"michaelajao/qwen3-4b-hope-forum-clean-lora",...}
+curl -s http://localhost:8011/version       # {"model_version":"michaelajao/qwen3.5-4b-hope-forum-lora",...}
 curl -s http://localhost:8011/admin/models  # the picker roster (current + options)
 curl -s http://localhost:8000/health        # engagement_ml: {"status":"ok","horizons":[7,14,...]}
 ```
@@ -187,11 +257,41 @@ sqlite3 comment_generation/outputs/hitl.sqlite \
 
 ---
 
-## 6. Related docs
+## 6. Observability
+
+| What | Where |
+| --- | --- |
+| Liveness | `GET /health` on both services |
+| Model audit | `GET /model/info` on engagement_ml; `GET /version` on comment-gen |
+| Prometheus metrics | `GET /metrics` on comment-gen (request latency, generate-time histogram, memory-hit rate) |
+| Application logs | stdout — both use uvicorn's access log + Python `logging` |
+
+In production, scrape `/metrics` into Prometheus/Grafana and alert on
+`hope_generate_latency_seconds{quantile="0.95"} > 8`.
+
+---
+
+## 7. Swapping in your own model
+
+The interfaces are stable and the implementations are swappable. Keep the
+FastAPI surface intact and the dashboard needs no change:
+
+- **engagement_ml** — any model taking a `ParticipantHistory` and
+  returning a `PredictResponse` works. Replace `_load_one` / `score_one`
+  in `deploy/api/inference.py`.
+- **comment_generation** — any backend taking a `RichGenerateRequest`
+  and returning a `GenerateResponse` works. Replace
+  `GenerationService.generate` in `service/generation_service.py`; the
+  routers, memory layer, and MI safety gate stay in front of it.
+
+The Pydantic schemas in `comment_generation/service/models.py` and
+`engagement_ml/deploy/api/schemas.py` are the source of truth.
+
+---
+
+## 8. Related docs
 
 - [INTEGRATION.md](../INTEGRATION.md) — API wire contract for platform callers
 - [ARCHITECTURE.md](../ARCHITECTURE.md) — why the system is shaped this way
-- [SELF_HOSTING.md](../SELF_HOSTING.md) — bring the backends in-house (Docker)
-- [deploy/azure/](azure/) — aspirational Azure Container Apps scaffolding
 - [comment_generation/space/DEPLOY.md](../../comment_generation/space/DEPLOY.md) — HF Space deploy (authoritative)
 - [comment_generation/docs/openapi.yaml](../../comment_generation/docs/openapi.yaml) — authoritative OpenAPI spec

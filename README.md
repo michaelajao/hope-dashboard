@@ -1,145 +1,159 @@
 # hope-dashboard
 
-Facilitator-facing dashboard for the Hope Programme AI Facilitator Assistant.
+The facilitator-facing dashboard for the HOPE Programme AI Facilitator
+Assistant. Facilitators use it to triage a cohort's participants by
+dropout risk, read what each person posted, and send a warm reply —
+starting from an AI-drafted suggestion they can edit or discard.
 
-Talks to two backends:
+The dashboard holds no models and no participant database. It is a
+Next.js app that reads cohort bundles from disk and calls two FastAPI
+services:
 
-- `comment_generation` FastAPI on `:8001` — three-persona draft generation,
-  participant memory store, HITL signal capture.
-- `engagement_ml` FastAPI on `:8000` — weekly dropout-risk scoring and
-  engagement features.
+| Service | Repo | Port | What it does |
+| --- | --- | --- | --- |
+| comment service | [`comment_generation`](https://github.com/michaelajao/comment_generation) | 8001 | Persona-conditioned reply drafts, participant memory, HITL capture |
+| risk service (engagement_ml) | [`engagement_ml`](https://github.com/michaelajao/engagement_ml) | 8000 | Weekly dropout-risk scores + contributing factors |
 
-## Stack
+Every backend call goes through the dashboard's own server-side proxy
+routes (`src/app/api/proxy/**`), which inject the credentials. The
+browser never sees a secret.
 
-- Next.js 16 (App Router), React 19, TypeScript 5
-- Tailwind CSS 4
-- TanStack Query v5 for server state, Zustand for client UI state
-- NextAuth v5 (magic-link) for facilitator auth
-- shadcn/ui components (added on demand when the panels are built)
-- `openapi-typescript` to derive types from `../comment_generation/docs/openapi.yaml`
+## Quickstart — the whole stack, one command
 
-## Getting started
+Needs Docker, plus sibling checkouts of `../comment_generation` and
+`../engagement_ml`. See [deploy/OPERATIONS.md §1.1](deploy/OPERATIONS.md)
+for the model bundles the risk service expects.
 
 ```bash
-cp .env.example .env.local        # fill in COMMENT_GEN_URL etc.
+cp .env.example .env              # fill in the secrets
+docker compose up --build         # dashboard on http://localhost:3000
+```
+
+No GPU? Run the comment service in stub mode — real UI, canned drafts:
+
+```bash
+HOPE_DISABLE_GENERATION=1 docker compose up --build
+```
+
+## Quickstart — dashboard only
+
+Use this when the backends already run somewhere (hosted Spaces, another
+box). Set `COMMENT_GEN_URL` / `DROPOUT_API_URL` to point at them.
+
+```bash
+cp .env.example .env.local        # set COMMENT_GEN_URL, DROPOUT_API_URL, secrets
 npm install
-npm run gen:types                 # regenerate types from the OpenAPI spec
 npm run dev                       # http://localhost:3000
 ```
-
-### Pointing at the backend
-
-`COMMENT_GEN_URL` (and `NEXT_PUBLIC_COMMENT_GEN_URL`) decides where the
-dashboard sends `/generate` and `/memory/...`. Three valid setups:
-
-| Setup | `COMMENT_GEN_URL` | When |
-|---|---|---|
-| Backend on same host | `http://localhost:8011` | Both repos running on the same machine. Note: `:8001` is held by JupyterHub on Brosnan HPC, so use `:8011` there. |
-| Backend on HPC, dashboard on laptop | `http://<hpc-tunnel-host>:8011` | SSH tunnel or Cloudflare Tunnel. |
-| Backend on HF Spaces | `https://michaelajao-hope-comment-gen-api.hf.space` | Production-style. See `comment_generation/space/DEPLOY.md`. |
-
-If running both backends locally:
-
-```bash
-# in comment_generation/
-HOPE_API_AUTH=disabled \
-HOPE_GEN_MODEL_ID=qwen3-4b-hope-only \
-uvicorn service.main:app --port 8011
-
-# in engagement_ml/deploy/
-uvicorn api.main:app --port 8000
-```
-
-### Run against the HPC over an SSH tunnel (workshop setup)
-
-The comment-gen service runs on the **Brosnan HPC** (SSH alias `bronan`,
-reached via the `zeus` login node — see `~/.ssh/config`) on `:8011`, reading
-the retrained LoRA adapters straight from its `models/`. To drive it from the
-laptop dashboard, forward the port and point `COMMENT_GEN_URL` at the tunnel.
-
-`.env.local` is already set to `COMMENT_GEN_URL=http://localhost:8011`. Then,
-in **two terminals**:
-
-```bash
-# Terminal 1 — SSH tunnel (leave open for the whole session)
-ssh -N -L 8011:localhost:8011 bronan
-
-# Terminal 2 — dashboard
-cd hope-dashboard
-npm run dev                       # http://localhost:3000
-```
-
-Verify the tunnel reaches the service before presenting:
-
-```bash
-curl -s http://localhost:8011/health        # -> {"status":"healthy", "model_loaded":true, ...}
-curl -s http://localhost:8011/admin/models  # -> the 9-adapter roster the picker shows
-```
-
-Notes:
-
-- **The tunnel is per-terminal** — if you close Terminal 1 (or the laptop
-  sleeps/restarts), the dashboard's backend goes offline until you reopen it.
-- If `/health` fails, the HPC uvicorn may have stopped. Restart it on bronan:
-  ```bash
-  cd ~/Research/comment_generation
-  HOPE_API_AUTH=disabled \
-  HOPE_GEN_MODEL_ID=michaelajao/qwen3-4b-hope-forum-clean-lora \
-  uvicorn service.main:app --host 0.0.0.0 --port 8011
-  ```
-- In the model picker, **"Qwen3 8B (forum)" is the heaviest** adapter — the
-  first request after switching to it is a slow cold load (then it's fine).
-  All 9 adapters resolve.
 
 > **Requires Next ≥ 16.2.7 + Tailwind ≥ 4.3.0.** Earlier combos had a
-> Turbopack ↔ Tailwind v4 bug: Turbopack ran PostCSS without a `from`, so
-> Tailwind resolved its base as the *parent* folder, failed to resolve
-> `@import "tailwindcss"`, and crawled every sibling repo's `node_modules` —
-> pinning RAM/disk to 100% on `npm run dev`. Tailwind 4.3.0 fixed the base
-> fallback (uses `process.cwd()` when `from` is absent). Don't downgrade below
-> these versions.
+> Turbopack ↔ Tailwind v4 bug that pinned RAM/disk to 100% on
+> `npm run dev`. Don't downgrade below these versions.
 
-### Auth
+## Configuration
 
-This dashboard uses NextAuth v5 with the **dev-allowlist Credentials
-provider** by default. Set `FACILITATOR_EMAILS=` to a comma-separated
-allowlist (empty = allow any email in dev). Magic-link via Nodemailer is
-intentionally not wired in this build because it pulls Node-only modules
-into the Edge runtime; re-introduce it through the documented Auth.js
-Edge/Node split when configuring SMTP for the real workshop.
+Copy `.env.example` to `.env` (compose) or `.env.local` (`next dev`); it
+documents every variable. The ones that decide where the backends live:
 
-For local development without HMAC, set `HOPE_API_AUTH=disabled` on the
-backend.
+| Variable | Purpose |
+| --- | --- |
+| `COMMENT_GEN_URL` | Comment service base URL |
+| `DROPOUT_API_URL` | Risk service base URL |
+| `HOPE_API_SECRET` | HMAC secret for signing comment-service writes; must match the service |
+| `HOPE_RISK_API_KEY` | `X-API-Key` for the risk service; must match the service |
+| `HF_TOKEN` | Read-scoped HF token — required when the backends are private HF Spaces |
+| `AUTH_SECRET` | NextAuth v5 signing key (`npx auth secret`) |
+| `FACILITATOR_EMAILS` | Comma-separated allowlist (empty = allow any email in dev) |
+
+Three ways to point at the backends:
+
+| Setup | `COMMENT_GEN_URL` | When |
+| --- | --- | --- |
+| Compose stack | `http://comment-api:8001` (set for you) | Default local development |
+| Private HF Spaces | `https://<owner>-hope-comment-gen-api.hf.space` | Hosted; also set `HF_TOKEN` |
+| HPC + SSH tunnel | `http://localhost:8011` | Maintainer-only — see [deploy/OPERATIONS.md](deploy/OPERATIONS.md) |
+
+**On ports:** the comment service listens on **8001** and the risk
+service on **8000** everywhere — locally, in compose, and in their
+container images. The **8011** you see in the HPC path is not a
+different service: `:8001` is taken by JupyterHub on that machine, so
+the service is bound to `:8011` there and the SSH tunnel maps it to
+`localhost:8011`. Hosted HF Spaces front both services on `:443`.
+
+## Auth
+
+NextAuth v5 with the **dev-allowlist Credentials provider**. Set
+`FACILITATOR_EMAILS` to a comma-separated allowlist; empty allows any
+email in dev. `AUTH_MODE=open` surfaces a "Testing mode" pill in the
+topbar — set `AUTH_MODE=allowlist` for a production posture.
+
+Magic-link via Nodemailer is intentionally not wired in this build: it
+pulls Node-only modules into the Edge runtime. Re-introduce it through
+the documented Auth.js Edge/Node split when configuring SMTP.
+
+For local work without HMAC, run the backends with
+`HOPE_API_AUTH=disabled`.
 
 ## Repo layout
 
-```
+```text
 src/
-  app/                  # App Router pages
-  components/           # shared UI components
+  app/
+    api/proxy/**          # server-side proxy routes — inject secrets, sign bodies
+    cohorts/[cohortId]/   # the main 3-column facilitator view
+  components/             # shared UI (ui/ holds shadcn-style primitives)
   lib/
     api/
-      client.ts         # generic HMAC-aware fetch wrapper
-      commentGen.ts     # typed client for :8001
-      dropout.ts        # typed client for :8000
-      types.ts          # auto-generated from comment_generation/docs/openapi.yaml
-    auth/
-      sign.ts           # server-only HMAC-SHA256 signer
+      client.ts           # generic auth-aware fetch wrapper
+      commentGen.ts       # typed client for the comment service
+      dropout.ts          # typed client for the risk service
+      types.ts            # generated from comment_generation/docs/openapi.yaml
+    auth/sign.ts          # server-only HMAC-SHA256 signer
+    server/cohort-data.ts # loads cohort bundles from local/
+    store/                # Zustand client-state stores
+local/                    # cohort bundles (real participant data — see below)
+scripts/                  # cohort extraction + end-to-end smoke tests
 ```
 
-## Updating the API contract
+## Participant data
 
-The OpenAPI spec is owned by `comment_generation/docs/openapi.yaml`. After
-any change there, regenerate the types:
+`local/iih-coh*.json` contain **real cohort data** from the HOPE
+platform. Display names are pseudonymised (`P1`, `P2`, …) but the post
+free-text is genuine participant writing, including health disclosures.
+Treat this repository as confidential; do not display raw bundles on a
+shared screen. Regenerate bundles from platform exports with
+`scripts/extract-iih-cohort.mjs`.
+
+## Development
 
 ```bash
-npm run gen:types
+npm run lint          # eslint
+npm run typecheck     # tsc --noEmit
+npm test              # vitest
+npm run build         # production build
+npm run gen:types     # regenerate src/lib/api/types.ts from the OpenAPI spec
 ```
 
-Commit the regenerated `src/lib/api/types.ts` so the dashboard build stays
-deterministic.
+CI runs all of the above on every push and pull request
+(`.github/workflows/ci.yml`).
+
+The API contract is owned by `comment_generation/docs/openapi.yaml`.
+After any change there, run `npm run gen:types` and commit the
+regenerated `src/lib/api/types.ts` so the build stays deterministic.
+
+End-to-end smoke test against a running stack:
+
+```bash
+bash scripts/smoke_e2e.sh
+```
 
 ## Demo target
 
 The end-to-end demo uses cohort `IIH-COH12-110226` (id 1680) in module
 `People living with IIH 2025 - V1` (id 337).
+
+## Documentation
+
+- [ARCHITECTURE.md](ARCHITECTURE.md) — why the system is shaped this way
+- [INTEGRATION.md](INTEGRATION.md) — API wire contract for platform engineers
+- [deploy/OPERATIONS.md](deploy/OPERATIONS.md) — self-hosting, deploy paths, model roster, runbook

@@ -100,7 +100,7 @@ def main() -> int:
     drafts_seen: list[dict] = []
 
     with httpx.Client() as client:
-        results.append(wait_for(client, f"{args.dropout_url}/health", "dropout-api"))
+        results.append(wait_for(client, f"{args.dropout_url}/health", "risk-api"))
         results.append(wait_for(client, f"{args.comment_url}/health", "comment-api"))
 
         # 1) Dropout /batch.

@@ -46,11 +46,9 @@ dev-server.log
 
 .playwright-mcp/
 
-# Cohort bundle extracted from Hope Move platform JSON exports lives at
-# `local/iih-coh12-110226.json`. Previously the entire `local/` directory
-# was gitignored to keep real participant data out of the repo; the demo
-# now ships the bundle in-tree so the dashboard is self-contained on any
-# host. Other ad-hoc files dropped into `local/` are still ignored.
+# Cohort bundles are committed so the dashboard is self-contained on any
+# host (see README → Participant data). Other ad-hoc files dropped into
+# `local/` are ignored.
 local/*
 !local/iih-coh10-190325.json
 !local/iih-coh11-170925.json
@@ -64,8 +62,4 @@ cohort-*.png
 hope-move dashboard.zip
 docs/plan.md
 
-# Slide deck (build_pptx.py) build + temp artifacts
-docs/slides/.render/
-docs/slides/.devserver.log
-docs/slides/assets/.build_norm/
-~$*.pptx
+.claude/settings.local.json

@@ -66,7 +66,7 @@ Cohort-change reset is centralised in [`CohortSessionReset`](src/components/coho
 
 ```
 src/lib/server/cohort-data.ts       (server-only)
-    │  reads local/iih-coh*.json bundle (gitignored, per-cohort)
+    │  reads local/iih-coh*.json bundle (committed, per-cohort)
     ▼
 useCohortBundle hook (TanStack Query, staleTime: ONE_DAY)
     │
@@ -306,8 +306,13 @@ Full reference: [comment_generation/docs/openapi.yaml](../comment_generation/doc
 | POST | `/memory/reply` | HMAC | upsert a facilitator reply |
 | GET | `/memory/{participant_id}` | HMAC | debug list of memory rows |
 | POST | `/sync/backfill-from-json` | HMAC | 501 — use the standalone CLI |
+| GET | `/admin/models` | open | picker roster: current adapter + options |
+| POST | `/admin/model` | HMAC | hot-swap the live adapter (~15–30 s) |
+| POST | `/text/summary` | HMAC | engagement summary for the detail panel |
+| POST | `/text/coaching` | HMAC | one tactical suggestion for the facilitator |
+| POST | `/text/polish` | HMAC | polish a facilitator's draft note |
 
-### engagement_ml (`dropout-api`, port 8000)
+### engagement_ml (`risk-api`, port 8000)
 
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
@@ -322,15 +327,28 @@ Full reference: [comment_generation/docs/openapi.yaml](../comment_generation/doc
 
 | Item | Location | Owner | Notes |
 | --- | --- | --- | --- |
-| Cohort bundle | `local/iih-coh*.json` (gitignored) | dashboard | extracted by [`scripts/extract-iih-cohort.mjs`](scripts/extract-iih-cohort.mjs) from raw txt exports; pre-de-identified |
+| Cohort bundle | `local/iih-coh*.json` (**committed** — see below) | dashboard | extracted by [`scripts/extract-iih-cohort.mjs`](scripts/extract-iih-cohort.mjs) from raw txt exports; pseudonymised |
 | Memory store | `/app/outputs/memory.sqlite` | comment_generation | created on first connect via `CREATE TABLE IF NOT EXISTS`; persistent on `/data` for HF Space |
 | HITL store | `/app/outputs/hitl.sqlite` | comment_generation | same lifecycle as memory; sole source for DPO/KTO training data |
-| LoRA adapter | `michaelajao/qwen3-4b-hope-forum-clean-lora` (default) | HF Hub (private) | swappable via `HOPE_GEN_MODEL_ID` / picker; downloads to HF cache on first use. Full roster in [deploy/OPERATIONS.md](deploy/OPERATIONS.md) §2 |
+| LoRA adapter | `michaelajao/qwen3.5-4b-hope-forum-lora` (default) | HF Hub (private) | swappable via `HOPE_GEN_MODEL_ID` / picker; downloads to HF cache on first use. Full roster in [deploy/OPERATIONS.md](deploy/OPERATIONS.md) §2 |
 | Base model | `Qwen/Qwen3-4B` | HF Hub (public) | downloaded by `transformers.from_pretrained` |
 | Dropout models | `engagement_ml/models/winner_T{7..42}.pkl` | engagement_ml | per-horizon RandomForest; Platt calibration files alongside |
 | Engagement panel | `cumulative_features_panel.parquet` | engagement_ml | optional; comment_generation falls back to request-body engagement when missing |
 
-Real Hope Move platform data is **gitignored** in `local/`. The exports are pre-de-identified per `engagement_ml/data/` policy: direct identifiers (names, emails, phones) are stripped before export. Anything we add downstream (the dashboard, the LoRA training) must not re-introduce identifiers — see the name-scrub path in [`src/generation_utils.py:scrub_first_names`](../comment_generation/src/generation_utils.py) for the training-side guard.
+**The cohort bundles in `local/` are committed and contain real Hope Move
+platform data.** Direct identifiers (names, emails, phones) are stripped
+before export and display names are pseudonymised to `P1`, `P2`, … — but
+the post free-text is genuine participant writing and includes health
+disclosures. Treat this repository as confidential.
+
+Anything added downstream (the dashboard, the LoRA training) must not
+re-introduce identifiers — see the name-scrub path in
+[`src/generation_utils.py:scrub_first_names`](../comment_generation/src/generation_utils.py)
+for the training-side guard.
+
+The raw platform exports the bundles are built from (`data/` in
+`comment_generation` and `engagement_ml`) are **gitignored** in those
+repos and must stay that way.
 
 ---
 
@@ -343,7 +361,7 @@ Real Hope Move platform data is **gitignored** in `local/`. The exports are pre-
 | Input safety block | comment_generation pipeline | 2 acknowledgement-only drafts + `safety_signposting` string |
 | Kill switch (`HOPE_DISABLE_GENERATION=1`) | comment_generation `/generate` | safe-stub drafts with `model_version: "stub-disabled"` |
 | Memory store unreachable | dashboard memory proxy | empty memory rows; generation still runs |
-| dropout-api unreachable | TanStack `error` state | inline "predictions unavailable" + retry |
+| risk-api unreachable | TanStack `error` state | inline "predictions unavailable" + retry |
 
 Container logs are the authoritative trace — `print(traceback)` is the runtime, plus the `/health` endpoint reports `model_loaded`, `memory_db`, and `dropout_api` status. Future work: forward HITL signals to a metrics pipeline.
 
@@ -353,11 +371,11 @@ Container logs are the authoritative trace — `print(traceback)` is the runtime
 
 | Layer | Today | Production target |
 | --- | --- | --- |
-| Dashboard | local Next.js dev server | Vercel or Azure App Service |
-| comment_generation | HF Space (Docker SDK, T4 small) | same, or self-hosted GPU |
-| engagement_ml | local FastAPI | Azure Container Apps (see [deploy/azure/](deploy/azure/)) |
-| Memory + HITL | `/data` on the HF Space volume | persistent volume (Azure Files / EBS) |
-| Secrets | `.env.local` on dev box + HF Space settings | Azure Key Vault (see [deploy/azure/keyvault-secrets.md](deploy/azure/keyvault-secrets.md)) |
+| Dashboard | local Next.js dev server | Vercel |
+| comment_generation | HF Space (Docker SDK, T4 small) | same, or self-hosted GPU via `docker compose` |
+| engagement_ml | HF Space (free CPU) | same, or self-hosted via `docker compose` |
+| Memory + HITL | `/data` on the HF Space volume | persistent volume on the self-host box |
+| Secrets | `.env.local` on dev box + HF Space settings | host env / secret manager of the hosting platform |
 
 Each layer is independently scalable. The dashboard is stateless. comment_generation pins to one instance per LoRA (state lives in the sqlite volume); horizontal scale needs Postgres + Redis. engagement_ml is fully stateless (pure RandomForest inference) — scale freely.
 
@@ -396,7 +414,6 @@ Each layer is independently scalable. The dashboard is stateless. comment_genera
 
 - [INTEGRATION.md](INTEGRATION.md) — for platform engineers integrating Hope Move with the two backing services
 - [deploy/OPERATIONS.md](deploy/OPERATIONS.md) — deploy paths, model roster + swap/retrain, runbook
-- [deploy/azure/README.md](deploy/azure/README.md) — Azure topology
 - [comment_generation/docs/openapi.yaml](../comment_generation/docs/openapi.yaml) — authoritative OpenAPI spec
 - [comment_generation/space/README.md](../comment_generation/space/README.md) — HF Space deployment specifics
 - [engagement_ml/README.md](../engagement_ml/README.md) — model research pipeline + LOCO metrics

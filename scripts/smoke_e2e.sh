@@ -21,7 +21,7 @@ if [ -n "${SKIP_COMPOSE:-}" ]; then
     echo "skipping docker compose up (SKIP_COMPOSE set)"
 else
     echo "ensuring docker compose stack is up..."
-    docker compose up -d dropout-api comment-api >/dev/null
+    docker compose up -d risk-api comment-api >/dev/null
 fi
 
 echo "running smoke checks against $COMMENT_URL and $DROPOUT_URL (auth=$AUTH_MODE)"

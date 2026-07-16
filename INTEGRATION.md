@@ -1,6 +1,12 @@
 # Hope Move integration guide
 
-For platform engineers integrating the two backing services into the Hope Move platform. The dashboard in this repo is a research/UX test surface, not part of the integration path — feel free to ignore it.
+For platform engineers wiring the two backing services **directly into
+the Hope Move platform** — i.e. calling `/predict` and `/generate` from
+your own product rather than through the facilitator dashboard.
+
+This is the wire contract only. If you want to run the system as shipped
+(dashboard + both services), start at the [README](README.md) instead;
+to host it, see [deploy/OPERATIONS.md](deploy/OPERATIONS.md).
 
 Two services. Independent. Stateless from the platform's perspective.
 
@@ -327,7 +333,7 @@ engagement_ml ships its model bundle (~50 MB, all `winner_T{T}.pkl` files) insid
 | `HOPE_RISK_API_KEY` | engagement_ml | 32-byte hex API key for X-API-Key auth |
 | `HOPE_API_SECRET` | comment-gen | 32-byte hex secret for HMAC auth |
 | `HF_TOKEN` | comment-gen | HF read token; only needed if the configured adapter is in a private repo |
-| `HOPE_GEN_MODEL_ID` | comment-gen | Which fine-tuned adapter to load. Default: `michaelajao/qwen3-4b-hope-forum-clean-lora` |
+| `HOPE_GEN_MODEL_ID` | comment-gen | Which fine-tuned adapter to load. Default: `michaelajao/qwen3.5-4b-hope-forum-lora` |
 | `HOPE_DROPOUT_URL` | comment-gen | Optional. URL of engagement_ml's `/predict` for the engagement-aware prompt path. Set to your risk-API base URL |
 
 ---
