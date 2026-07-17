@@ -94,27 +94,6 @@ the documented Auth.js Edge/Node split when configuring SMTP.
 For local work without HMAC, run the backends with
 `HOPE_API_AUTH=disabled`.
 
-## Repo layout
-
-```text
-src/
-  app/
-    api/proxy/**          # server-side proxy routes — inject secrets, sign bodies
-    cohorts/[cohortId]/   # the main 3-column facilitator view
-  components/             # shared UI (ui/ holds shadcn-style primitives)
-  lib/
-    api/
-      client.ts           # generic auth-aware fetch wrapper
-      commentGen.ts       # typed client for the comment service
-      dropout.ts          # typed client for the risk service
-      types.ts            # generated from comment_generation/docs/openapi.yaml
-    auth/sign.ts          # server-only HMAC-SHA256 signer
-    server/cohort-data.ts # loads cohort bundles from local/
-    store/                # Zustand client-state stores
-local/                    # cohort bundles (real participant data — see below)
-scripts/                  # cohort extraction + end-to-end smoke tests
-```
-
 ## Participant data
 
 `local/iih-coh*.json` contain **real cohort data** from the HOPE
