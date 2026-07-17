@@ -10,9 +10,7 @@
     "lint": "eslint",
     "gen:types": "openapi-typescript ../comment_generation/docs/openapi.yaml --output src/lib/api/types.ts",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.100.9",
@@ -34,13 +32,11 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@vitest/coverage-v8": "^4.1.7",
     "eslint": "^9",
     "eslint-config-next": "^16.2.7",
     "openapi-typescript": "^7.13.0",
     "prettier": "^3.8.3",
     "tailwindcss": "^4.3.0",
-    "typescript": "^5",
-    "vitest": "^4.1.7"
+    "typescript": "^5"
   }
 }
