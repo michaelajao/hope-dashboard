@@ -12,7 +12,8 @@
  * any host. The synthetic-fallback path that previously rendered
  * fake participants when the file was absent has been removed — if the
  * file ever disappears, the API route returns 204 and the queue shows
- * an empty state rather than fabricating data.
+ * an empty state rather than fabricating data. Read/parse failures on a
+ * bundle that IS present propagate rather than degrading to empty.
  */
 
 import fs from "node:fs";
@@ -116,33 +117,29 @@ const _cache: Map<number, CacheEntry> = new Map();
  * important during dev: when the extraction script is re-run, the next
  * dashboard request picks up the new data without a Next.js restart.
  *
- * Returns `null` when the cohort has no bundle slug or the file isn't
- * on disk yet — the API route surfaces this as a 204 and the queue
- * renders its empty state.
+ * Returns `null` only when the cohort has no bundle slug or the file
+ * isn't on disk yet — the API route surfaces this as a 204 and the queue
+ * renders its empty state. That absence is a real state, not a failure.
+ *
+ * A bundle that IS on disk but can't be read or parsed throws. It
+ * previously logged a warning and returned `null`, which rendered a
+ * corrupt bundle as an ordinary empty queue — indistinguishable from a
+ * cohort that legitimately has no data, and silent enough to ship.
  */
 export function loadCohortBundle(cohortId: number): CohortBundle | null {
     const bundlePath = bundlePathFor(cohortId);
     if (!bundlePath) return null;
-    try {
-        if (!fs.existsSync(bundlePath)) {
-            _cache.set(cohortId, { bundle: null, mtimeMs: null });
-            return null;
-        }
-        const mtimeMs = fs.statSync(bundlePath).mtimeMs;
-        const cached = _cache.get(cohortId);
-        if (cached && cached.mtimeMs === mtimeMs) {
-            return cached.bundle;
-        }
-        const raw = fs.readFileSync(bundlePath, "utf8");
-        const bundle = JSON.parse(raw) as CohortBundle;
-        _cache.set(cohortId, { bundle, mtimeMs });
-        return bundle;
-    } catch (err) {
-        console.warn(
-            `[cohort-data] failed to load bundle for cohort ${cohortId}:`,
-            err,
-        );
+    if (!fs.existsSync(bundlePath)) {
         _cache.set(cohortId, { bundle: null, mtimeMs: null });
         return null;
     }
+    const mtimeMs = fs.statSync(bundlePath).mtimeMs;
+    const cached = _cache.get(cohortId);
+    if (cached && cached.mtimeMs === mtimeMs) {
+        return cached.bundle;
+    }
+    const raw = fs.readFileSync(bundlePath, "utf8");
+    const bundle = JSON.parse(raw) as CohortBundle;
+    _cache.set(cohortId, { bundle, mtimeMs });
+    return bundle;
 }

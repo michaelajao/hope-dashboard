@@ -26,14 +26,9 @@ import {
     useThumb,
 } from "@/lib/hooks/api";
 import { demoEngagementContext, weekNumber } from "@/lib/demo-events";
-import { seedDemoMemory } from "@/lib/demo-memory";
 import { getProfile } from "@/lib/profile";
 import { useCohortBundle } from "@/lib/hooks/useCohortBundle";
-import {
-    bundleToHistory,
-    findRealParticipant,
-    renderThreadContext,
-} from "@/lib/realCohort";
+import { bundleToHistory, renderThreadContext } from "@/lib/realCohort";
 import {
     scoreAtDay as scoreAtDayForWeek,
     useScoringStore,
@@ -184,22 +179,6 @@ export function Drafts({ cohort }: { cohort: CohortMeta }) {
     const generate = useGenerate();
     const thumb = useThumb();
     const event = useEvent();
-
-    // Best-effort: seed prior posts the first time this participant's panel
-    // opens, so the next /generate has memory to retrieve. Seeds come from the
-    // real cohort bundle (activity descriptions + facilitator replies). With no
-    // bundle there's nothing to seed (the old synthetic-template path is
-    // retired, SEED_TEMPLATES is empty).
-    //
-    // Idempotent (de-duped inside seedDemoMemory) and silent on failure
-    // (comment-gen offline = no-op via the proxy's degrade-to-skipped).
-    useEffect(() => {
-        if (!selectedId) return;
-        const real = bundle.data
-            ? findRealParticipant(bundle.data, selectedId)
-            : null;
-        seedDemoMemory(selectedId, cohort.id, cohort.moduleId, real ?? null);
-    }, [selectedId, cohort.id, cohort.moduleId, bundle.data]);
 
     if (!selectedId) {
         return (
