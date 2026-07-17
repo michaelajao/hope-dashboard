@@ -19,14 +19,14 @@ Three services, no shared database, no synchronous chain:
 │  (Next.js 16, Vercel)   │    │  FastAPI / port 8001      │  → drafts + memory + HITL
 │                         │    └───────────────────────────┘
 │  Server proxy layer     │    ┌───────────────────────────┐
-│  signs HMAC, forwards   │───▶│  engagement_ml            │  RandomForest @ T∈{7,14,21,28,35,42}
+│  signs HMAC, forwards   │───▶│  engagement_ml            │  LightGBM @ T∈{7,14,21,28,35,42}
 │  HF_TOKEN, hides keys   │    │  FastAPI / port 8000      │  → dropout risk + SHAP factors
 └─────────────────────────┘    └───────────────────────────┘
 ```
 
 **Why three services, not one.** Each owns a different lifecycle:
 
-- `engagement_ml` is read-heavy stateless inference (RandomForest pickle, no writes).
+- `engagement_ml` is read-heavy stateless inference (LightGBM pickle, no writes).
 - `comment_generation` is read+write — drafts are inference, but the memory store and HITL log are persistent.
 - `hope-dashboard` is the only UI surface — facilitators interact here; it never serves to the public Hope Move platform.
 
@@ -179,7 +179,7 @@ POST /predict (or /batch)
   │     bookmark count, reply rate, facilitator contact count, ...)
   │
   ├─ load_winner(score_at_day) → models/winner_T{T}.pkl
-  │    one RandomForest per horizon; T ∈ {7,14,21,28,35,42}
+  │    one LightGBM per horizon; T ∈ {7,14,21,28,35,42}
   │
   ├─ Platt calibration → models/platt_T{T}.pkl
   │    raw probability → calibrated dropout_risk
@@ -332,7 +332,7 @@ Full reference: [comment_generation/docs/openapi.yaml](../comment_generation/doc
 | HITL store | `/app/outputs/hitl.sqlite` | comment_generation | same lifecycle as memory; sole source for DPO/KTO training data |
 | LoRA adapter | `michaelajao/qwen3.5-4b-hope-forum-lora` (default) | HF Hub (private) | swappable via `HOPE_GEN_MODEL_ID` / picker; downloads to HF cache on first use. Full roster in [deploy/OPERATIONS.md](deploy/OPERATIONS.md) §2 |
 | Base model | `Qwen/Qwen3-4B` | HF Hub (public) | downloaded by `transformers.from_pretrained` |
-| Dropout models | `engagement_ml/models/winner_T{7..42}.pkl` | engagement_ml | per-horizon RandomForest; Platt calibration files alongside |
+| Dropout models | `engagement_ml/models/winner_T{7..42}.pkl` | engagement_ml | per-horizon LightGBM; Platt calibration files alongside |
 | Engagement panel | `cumulative_features_panel.parquet` | engagement_ml | optional; comment_generation falls back to request-body engagement when missing |
 
 **The cohort bundles in `local/` are committed and contain real Hope Move
@@ -377,7 +377,7 @@ Container logs are the authoritative trace — `print(traceback)` is the runtime
 | Memory + HITL | `/data` on the HF Space volume | persistent volume on the self-host box |
 | Secrets | `.env.local` on dev box + HF Space settings | host env / secret manager of the hosting platform |
 
-Each layer is independently scalable. The dashboard is stateless. comment_generation pins to one instance per LoRA (state lives in the sqlite volume); horizontal scale needs Postgres + Redis. engagement_ml is fully stateless (pure RandomForest inference) — scale freely.
+Each layer is independently scalable. The dashboard is stateless. comment_generation pins to one instance per LoRA (state lives in the sqlite volume); horizontal scale needs Postgres + Redis. engagement_ml is fully stateless (pure LightGBM inference) — scale freely.
 
 ---
 

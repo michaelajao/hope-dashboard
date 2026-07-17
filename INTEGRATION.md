@@ -12,7 +12,7 @@ Two services. Independent. Stateless from the platform's perspective.
 
 | Service | Repo | Default port | Purpose |
 | --- | --- | --- | --- |
-| **engagement_ml** | [`engagement_ml`](https://github.com/michaelajao/engagement_ml) | 8000 | Dropout-risk prediction. Random Forest + Platt calibration + TreeSHAP. |
+| **engagement_ml** | [`engagement_ml`](https://github.com/michaelajao/engagement_ml) | 8000 | Dropout-risk prediction. LightGBM + Platt calibration + TreeSHAP. |
 | **comment_generation** | [`comment_generation`](https://github.com/michaelajao/comment_generation) | 8001 | Persona-conditioned reply drafting (2–3 drafts for activity posts, 1 for forum/Discussion replies). Holds memory of past posts + HITL log. |
 
 ---
@@ -127,7 +127,7 @@ The dashboard in this repo simulates the read side (compute-on-demand with a 1-d
   "threshold_used": 0.529,
   "threshold_low": 0.162,
   "threshold_high": 0.511,
-  "model_version": "random_forest_T42@5579a582da15",
+  "model_version": "lightgbm_T42@5579a582da15",
   "horizon_used": 42,
   "programme_length_days": 42,
   "score_at_day": 42,

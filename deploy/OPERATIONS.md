@@ -8,7 +8,7 @@ For *why* the system is shaped this way, see [ARCHITECTURE.md](../ARCHITECTURE.m
 
 | Service | Repo | Port | Auth | Serves |
 | --- | --- | --- | --- | --- |
-| **engagement_ml** | [`engagement_ml`](https://github.com/michaelajao/engagement_ml) | 8000 | `X-API-Key: $HOPE_RISK_API_KEY` | dropout risk: per-horizon RandomForest + Platt + TreeSHAP |
+| **engagement_ml** | [`engagement_ml`](https://github.com/michaelajao/engagement_ml) | 8000 | `X-API-Key: $HOPE_RISK_API_KEY` | dropout risk: per-horizon LightGBM + Platt + TreeSHAP |
 | **comment_generation** | [`comment_generation`](https://github.com/michaelajao/comment_generation) | 8001 (8011 on Brosnan HPC — `:8001` is held by JupyterHub) | `X-HMAC-Signature` over raw body, key `$HOPE_API_SECRET` | persona reply drafting + memory + HITL |
 
 Read endpoints (`/health`, `/version`, `/model/info`, `/admin/models`) are
@@ -158,13 +158,13 @@ forum-trained adapters.
 
 ## 3. Dropout-risk models (engagement_ml)
 
-Per-horizon RandomForest, one model per trained horizon `T ∈ {7,14,21,28,35,42}`,
+Per-horizon LightGBM, one model per trained horizon `T ∈ {7,14,21,28,35,42}`,
 each with a Platt calibrator. Bundles total ~50 MB and are baked into the
 container image — no fetch at startup.
 
 ```
 deploy/models/
-  winner_T7.pkl  winner_T14.pkl … winner_T42.pkl      # RandomForest per horizon
+  winner_T7.pkl  winner_T14.pkl … winner_T42.pkl      # LightGBM per horizon
   platt_T7.pkl   platt_T14.pkl  … platt_T42.pkl        # calibration
   feature_names_T*.json  model_card_T*.json            # audit
 ```
