@@ -49,17 +49,19 @@ export type EventRecord = {
 /**
  * One participant's raw event history at score-time.
  *
- * Cohort-context fields (`cohort_size`, `cohort_facilitator_density`) are
- * supplied by the caller because engagement_ml's training-time
- * `cohort_facilitator_density_loo` is a leave-one-out within-cohort
- * average; at inference we use the caller-supplied value directly.
+ * `cohort_size` is a live cohort-context feature. `cohort_facilitator_density`
+ * is retained in the request for backward compatibility but is no longer a
+ * model feature: the training-time leave-one-out density feature was removed
+ * because it could not be reproduced identically at serve-time, so any value
+ * supplied here is accepted and ignored.
  */
 export type ParticipantHistory = {
     participant_id: string;
     effective_start: string; // ISO-8601
     events: EventRecord[];
     cohort_size: number;
-    cohort_facilitator_density: number;
+    /** @deprecated no longer used as a model feature; accepted and ignored. */
+    cohort_facilitator_density?: number;
     programme_length_days: number;
     score_at_day: number;
 };
